@@ -22,7 +22,7 @@ export default {
     },
 
     // 删除邮箱
-    deleteEmail(emailId) {
+    removeEmail(emailId) { // renamed for store consistency
         return http.delete(`/users/emails/${emailId}`)
     },
 
@@ -32,17 +32,17 @@ export default {
     },
 
     // 删除手机号
-    deletePhone(phoneId) {
+    removePhone(phoneId) { // renamed for consistency
         return http.delete(`/users/phones/${phoneId}`)
     },
 
     // 用户关联医疗机构
-    addProvider(userId, providerId) {
+    linkProvider(userId, providerId) { // renamed to match store usage
         return http.post(`/users/${userId}/providers/${providerId}`)
     },
 
     // 取消关联医疗机构
-    removeProvider(userId, providerId) {
-        return http.delete(`/users/${userId}/providers/${providerId}`)
+    unlinkProvider(linkId) { // renamed to match store usage; assuming linkId is relation id
+        return http.delete(`/users/providers/${linkId}`)
     },
 }

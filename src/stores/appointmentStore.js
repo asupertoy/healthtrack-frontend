@@ -4,31 +4,37 @@ import appointmentApi from '../api/appointmentApi'
 export const useAppointmentStore = defineStore('appointmentStore', {
     state: () => ({
         appointments: [],
-        loading: false
+        loading: false,
+        error: null
     }),
 
     actions: {
-        async loadAppointments(userId) {
+        async fetchAppointments(userId) {
             this.loading = true
+            this.error = null
             try {
-                const res = await appointmentApi.getAppointments(userId)
-                this.appointments = res.data
+                const data = await appointmentApi.getAppointments(userId)
+                this.appointments = data
+                return data
+            } catch (e) {
+                this.error = e.message
+                throw e
             } finally {
                 this.loading = false
             }
         },
 
-        async createAppointment(data) {
-            const res = await appointmentApi.createAppointment(data)
-            this.appointments.push(res.data)
-            return res.data
+        async createAppointment(payload) {
+            const data = await appointmentApi.createAppointment(payload)
+            this.appointments.push(data)
+            return data
         },
 
-        async updateAppointment(id, data) {
-            const res = await appointmentApi.updateAppointment(id, data)
+        async updateAppointment(id, payload) {
+            const data = await appointmentApi.updateAppointment(id, payload)
             const index = this.appointments.findIndex(a => a.appointmentId === id)
-            if (index !== -1) this.appointments[index] = res.data
-            return res.data
+            if (index !== -1) this.appointments[index] = data
+            return data
         },
 
         async deleteAppointment(id) {

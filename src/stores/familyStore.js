@@ -5,30 +5,42 @@ export const useFamilyStore = defineStore('familyStore', {
     state: () => ({
         groups: [],
         members: [],
-        loading: false
+        loading: false,
+        error: null
     }),
 
     actions: {
-        async loadGroups(userId) {
-            const res = await familyApi.getGroups(userId)
-            this.groups = res.data
+        async fetchGroups(userId) {
+            this.loading = true
+            this.error = null
+            try {
+                const data = await familyApi.getFamilyGroups(userId)
+                this.groups = data
+                return data
+            } catch (e) {
+                this.error = e.message
+                throw e
+            } finally {
+                this.loading = false
+            }
         },
 
-        async loadMembers(groupId) {
-            const res = await familyApi.getMembers(groupId)
-            this.members = res.data
+        async fetchGroupDetail(groupId) {
+            const detail = await familyApi.getGroupDetail(groupId)
+            this.members = detail.members || []
+            return detail
         },
 
-        async createGroup(data) {
-            const res = await familyApi.createGroup(data)
-            this.groups.push(res.data)
-            return res.data
+        async createGroup(payload) {
+            const data = await familyApi.createGroup(payload)
+            this.groups.push(data)
+            return data
         },
 
         async addMember(groupId, userId) {
-            const res = await familyApi.addMember(groupId, userId)
-            this.members.push(res.data)
-            return res.data
+            const data = await familyApi.addMember(groupId, userId)
+            this.members.push(data)
+            return data
         },
 
         async removeMember(memberId) {
@@ -37,4 +49,3 @@ export const useFamilyStore = defineStore('familyStore', {
         }
     }
 })
-jxu

@@ -5,30 +5,42 @@ export const useChallengeStore = defineStore('challengeStore', {
     state: () => ({
         challenges: [],
         participants: [],
-        loading: false
+        loading: false,
+        error: null
     }),
 
     actions: {
-        async loadChallenges() {
+        async fetchChallenges() {
             this.loading = true
+            this.error = null
             try {
-                const res = await challengeApi.getChallenges()
-                this.challenges = res.data
+                const data = await challengeApi.getChallenges()
+                this.challenges = data
+                return data
+            } catch (e) {
+                this.error = e.message
+                throw e
             } finally {
                 this.loading = false
             }
         },
 
-        async createChallenge(data) {
-            const res = await challengeApi.createChallenge(data)
-            this.challenges.push(res.data)
-            return res.data
+        async createChallenge(payload) {
+            const data = await challengeApi.createChallenge(payload)
+            this.challenges.push(data)
+            return data
         },
 
         async joinChallenge(challengeId, userId) {
-            const res = await challengeApi.joinChallenge(challengeId, userId)
-            this.participants.push(res.data)
-            return res.data
+            const data = await challengeApi.joinChallenge(challengeId, userId)
+            this.participants.push(data)
+            return data
+        },
+
+        async fetchParticipants(challengeId) {
+            const detail = await challengeApi.getChallengeDetail(challengeId)
+            this.participants = detail.participants || []
+            return this.participants
         }
     }
 })

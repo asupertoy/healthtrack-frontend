@@ -20,7 +20,7 @@ export default {
         { name: 'Appointments', path: '/appointments' },
         { name: 'Challenges', path: '/challenges' },
         { name: 'Monthly Summary', path: '/monthly-summary' },
-        { name: 'Family Group', path: '/family-group' },
+        { name: 'Family Group', path: '/family' }, // corrected route
         { name: 'Search', path: '/search' }
       ]
     }

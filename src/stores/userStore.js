@@ -14,33 +14,37 @@ export const useUserStore = defineStore('userStore', {
         async login(email, password) {
             this.loading = true
             try {
-                const res = await userApi.login({ email, password })
-                this.user = res.data
-                return res.data
+                const data = await userApi.login({ email, password })
+                this.user = data
+                this.emails = data.emails || []
+                this.phones = data.phones || []
+                this.providers = data.providers || []
+                return data
             } finally {
                 this.loading = false
             }
         },
 
         async loadUser(userId) {
-            const res = await userApi.getUser(userId)
-            this.user = res.data
-            this.emails = res.data.emails || []
-            this.phones = res.data.phones || []
-            this.providers = res.data.providers || []
+            const data = await userApi.getUser(userId)
+            this.user = data
+            this.emails = data.emails || []
+            this.phones = data.phones || []
+            this.providers = data.providers || []
         },
 
-        async updateUser(data) {
-            const res = await userApi.updateUser(this.user.userId, data)
-            this.user = res.data
-            return res.data
+        async updateUser(payload) {
+            if (!this.user?.userId) throw new Error('No user loaded')
+            const data = await userApi.updateUser(this.user.userId, payload)
+            this.user = data
+            return data
         },
 
-        // email ops
         async addEmail(email) {
-            const res = await userApi.addEmail(this.user.userId, email)
-            this.emails.push(res.data)
-            return res.data
+            if (!this.user?.userId) throw new Error('No user loaded')
+            const data = await userApi.addEmail(this.user.userId, email)
+            this.emails.push(data)
+            return data
         },
 
         async removeEmail(emailId) {
@@ -48,11 +52,23 @@ export const useUserStore = defineStore('userStore', {
             this.emails = this.emails.filter(e => e.emailId !== emailId)
         },
 
-        // provider link
+        async addPhone(phone) {
+            if (!this.user?.userId) throw new Error('No user loaded')
+            const data = await userApi.addPhone(this.user.userId, phone)
+            this.phones.push(data)
+            return data
+        },
+
+        async removePhone(phoneId) {
+            await userApi.removePhone(phoneId)
+            this.phones = this.phones.filter(p => p.phoneId !== phoneId)
+        },
+
         async linkProvider(providerId) {
-            const res = await userApi.linkProvider(this.user.userId, providerId)
-            this.providers.push(res.data)
-            return res.data
+            if (!this.user?.userId) throw new Error('No user loaded')
+            const data = await userApi.linkProvider(this.user.userId, providerId)
+            this.providers.push(data)
+            return data
         },
 
         async unlinkProvider(linkId) {

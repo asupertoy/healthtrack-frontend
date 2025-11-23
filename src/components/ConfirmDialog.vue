@@ -1,14 +1,15 @@
 <template>
   <el-dialog
-      :visible.sync="visible"
+      v-model="internalVisible"
       width="400px"
-      :before-close="handleClose"
   >
     <p>{{ message }}</p>
-    <span slot="footer" class="dialog-footer">
-      <el-button @click="handleCancel">取消</el-button>
-      <el-button type="primary" @click="handleConfirm">确认</el-button>
-    </span>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="handleCancel">取消</el-button>
+        <el-button type="primary" @click="handleConfirm">确认</el-button>
+      </span>
+    </template>
   </el-dialog>
 </template>
 
@@ -16,21 +17,27 @@
 export default {
   name: 'ConfirmDialog',
   props: {
-    visible: Boolean,
+    modelValue: { // use v-model for external control
+      type: Boolean,
+      default: false
+    },
     message: String
   },
-  emits: ['update:visible', 'confirm', 'cancel'],
+  emits: ['update:modelValue', 'confirm', 'cancel'],
+  computed: {
+    internalVisible: {
+      get() { return this.modelValue },
+      set(val) { this.$emit('update:modelValue', val) }
+    }
+  },
   methods: {
-    handleClose() {
-      this.$emit('update:visible', false)
-    },
     handleCancel() {
       this.$emit('cancel')
-      this.$emit('update:visible', false)
+      this.$emit('update:modelValue', false)
     },
     handleConfirm() {
       this.$emit('confirm')
-      this.$emit('update:visible', false)
+      this.$emit('update:modelValue', false)
     }
   }
 }

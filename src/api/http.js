@@ -14,22 +14,15 @@ http.interceptors.request.use(config => {
     return config
 })
 
-http.interceptors.response.use(
-    response => response.data,
-    error => {
-        console.error('API Error:', error)
-        throw error
-    }
-)
-
+// 统一响应处理：直接返回 data；统一错误提示
 http.interceptors.response.use(
     response => response.data,
     error => {
         const message = error.response?.data?.message || error.message
+        console.error('API Error:', message)
         alert(`API Error: ${message}`)
         return Promise.reject(error)
     }
 )
-
 
 export default http
