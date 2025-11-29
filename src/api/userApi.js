@@ -1,48 +1,60 @@
 import http from './http'
 
 export default {
-    // 登录
-    login(data) {
-        return http.post('/auth/login', data)
+    // 用户模块基础 CRUD
+    createUser(payload) {
+        return http.post('/users', payload).then(res => res.data)
     },
 
-    // 获取用户资料
-    getUser(userId) {
-        return http.get(`/users/${userId}`)
+    getUsers() {
+        return http.get('/users').then(res => res.data)
     },
 
-    // 更新用户资料
+    getUserById(userId) {
+        return http.get(`/users/${userId}`).then(res => res.data)
+    },
+
+    deleteUser(userId) {
+        return http.delete(`/users/${userId}`).then(res => res.data)
+    },
+
     updateUser(userId, payload) {
-        return http.put(`/users/${userId}`, payload)
+        // 后端规范没有单独写更新，可按实际接口调整；这里假设 PUT /api/users/{id}
+        return http.put(`/users/${userId}`, payload).then(res => res.data)
     },
 
-    // 添加邮箱
-    addEmail(userId, email) {
-        return http.post(`/users/${userId}/emails`, { email })
+    // 邮箱相关（按你的邮箱模块 API 可能单独有 /api/emails，这里保留用户下挂方式，具体按后端实现调整）
+    addEmail(userId, { emailAddress }) {
+        // 如果实际后端是 /api/emails/create，可以改为 http.post('/emails/create', { userId, emailAddress })
+        return http.post(`/users/${userId}/emails`, { emailAddress }).then(res => res.data)
     },
 
-    // 删除邮箱
-    removeEmail(emailId) { // renamed for store consistency
-        return http.delete(`/users/emails/${emailId}`)
+    removeEmail(emailId) {
+        // 若后端为 DELETE /api/emails/{id}
+        return http.delete(`/emails/${emailId}`).then(res => res.data)
     },
 
-    // 添加手机号
-    addPhone(userId, phone) {
-        return http.post(`/users/${userId}/phones`, { phone })
+    // 手机号相关（如果有对应后端接口）
+    addPhone(userId, { phoneNumber }) {
+        return http.post(`/users/${userId}/phones`, { phoneNumber }).then(res => res.data)
     },
 
-    // 删除手机号
-    removePhone(phoneId) { // renamed for consistency
-        return http.delete(`/users/phones/${phoneId}`)
+    removePhone(phoneId) {
+        return http.delete(`/users/phones/${phoneId}`).then(res => res.data)
     },
 
-    // 用户关联医疗机构
-    linkProvider(userId, providerId) { // renamed to match store usage
-        return http.post(`/users/${userId}/providers/${providerId}`)
+    // User-Provider 关联：使用后端的 provider-links 子模块
+    addProviderLink(userId, providerId, isPrimary = false) {
+        return http.post(`/users/${userId}/provider-links`, null, {
+            params: { providerId, isPrimary },
+        }).then(res => res.data)
     },
 
-    // 取消关联医疗机构
-    unlinkProvider(linkId) { // renamed to match store usage; assuming linkId is relation id
-        return http.delete(`/users/providers/${linkId}`)
+    getProviderLinks(userId) {
+        return http.get(`/users/${userId}/provider-links`).then(res => res.data)
+    },
+
+    deleteProviderLink(linkId) {
+        return http.delete(`/users/provider-links/${linkId}`).then(res => res.data)
     },
 }

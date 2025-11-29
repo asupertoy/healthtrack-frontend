@@ -6,15 +6,15 @@ export const useChallengeStore = defineStore('challengeStore', {
         challenges: [],
         participants: [],
         loading: false,
-        error: null
+        error: null,
     }),
 
     actions: {
-        async fetchChallenges() {
+        async fetchChallenges(params) {
             this.loading = true
             this.error = null
             try {
-                const data = await challengeApi.getChallenges()
+                const data = await challengeApi.getChallenges(params)
                 this.challenges = data
                 return data
             } catch (e) {
@@ -31,16 +31,35 @@ export const useChallengeStore = defineStore('challengeStore', {
             return data
         },
 
-        async joinChallenge(challengeId, userId) {
-            const data = await challengeApi.joinChallenge(challengeId, userId)
+        async addParticipant(challengeId, userId) {
+            const data = await challengeApi.addParticipant(challengeId, userId)
             this.participants.push(data)
             return data
         },
 
         async fetchParticipants(challengeId) {
-            const detail = await challengeApi.getChallengeDetail(challengeId)
-            this.participants = detail.participants || []
+            const list = await challengeApi.getParticipants(challengeId)
+            this.participants = list || []
             return this.participants
-        }
-    }
+        },
+
+        async removeParticipant(challengeId, userId) {
+            await challengeApi.removeParticipant(challengeId, userId)
+            this.participants = this.participants.filter(
+                p => !(p.challengeId === challengeId && p.userId === userId)
+            )
+        },
+
+        async updateParticipantStatus(challengeId, userId, status) {
+            const updated = await challengeApi.updateParticipantStatus(challengeId, userId, status)
+            // 简单更新本地状态：按 userId 替换
+            const idx = this.participants.findIndex(
+                p => p.challengeId === challengeId && p.userId === userId
+            )
+            if (idx !== -1) {
+                this.participants[idx] = updated
+            }
+            return updated
+        },
+    },
 })

@@ -1,9 +1,13 @@
 <template>
   <header class="app-header">
-    <div class="logo">HealthTrack</div>
-    <div class="user-info">
-      <span>{{ userName }}</span>
-      <button @click="$emit('logout')">退出</button>
+    <div class="left">
+      <div class="logo">HealthTrack</div>
+      <span class="tagline">Personal Wellness Platform</span>
+    </div>
+    <div class="right">
+      <div class="avatar">{{ (userName||'G').charAt(0).toUpperCase() }}</div>
+      <span class="username">{{ userName }}</span>
+      <el-button size="small" @click="$emit('logout')" type="danger">退出</el-button>
     </div>
   </header>
 </template>
@@ -11,12 +15,7 @@
 <script>
 export default {
   name: 'AppHeader',
-  props: {
-    userName: {
-      type: String,
-      default: 'Guest'
-    }
-  }
+  props: { userName: { type:String, default:'Guest' } }
 }
 </script>
 
@@ -27,20 +26,42 @@ export default {
   align-items: center;
   height: 60px;
   padding: 0 20px;
-  background-color: #409EFF;
+  background: linear-gradient(120deg, #409EFF, #66b1ff);
   color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .12);
+}
+.left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 .logo {
   font-size: 20px;
-  font-weight: bold;
+  font-weight: 700;
+  letter-spacing: .5px;
 }
-.user-info button {
-  margin-left: 10px;
-  padding: 4px 8px;
-  border: none;
-  background-color: #fff;
+.tagline {
+  font-size: 12px;
+  opacity: .9;
+}
+.right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #fff;
   color: #409EFF;
-  cursor: pointer;
-  border-radius: 4px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .4);
+}
+.username {
+  font-weight: 600;
 }
 </style>

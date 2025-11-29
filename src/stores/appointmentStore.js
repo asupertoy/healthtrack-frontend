@@ -9,11 +9,11 @@ export const useAppointmentStore = defineStore('appointmentStore', {
     }),
 
     actions: {
-        async fetchAppointments(userId) {
+        async fetchAppointments(params) {
             this.loading = true
             this.error = null
             try {
-                const data = await appointmentApi.getAppointments(userId)
+                const data = await appointmentApi.getAppointments(params)
                 this.appointments = data
                 return data
             } catch (e) {
@@ -30,8 +30,9 @@ export const useAppointmentStore = defineStore('appointmentStore', {
             return data
         },
 
-        async updateAppointment(id, payload) {
-            const data = await appointmentApi.updateAppointment(id, payload)
+        async updateAppointment(payload) {
+            const data = await appointmentApi.updateAppointment(payload)
+            const id = data.appointmentId
             const index = this.appointments.findIndex(a => a.appointmentId === id)
             if (index !== -1) this.appointments[index] = data
             return data

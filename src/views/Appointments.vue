@@ -30,15 +30,20 @@
         <el-button type="primary" @click="refresh" :loading="loading">刷新</el-button>
       </div>
       <LoadingSpinner :visible="loading" text="加载中..." />
-      <el-table :data="appointmentStore.appointments" v-loading="loading" size="small" style="width:100%;" empty-text="暂无预约">
+      <el-table :data="formattedAppointments" v-loading="loading" size="small" style="width:100%;" empty-text="暂无预约">
         <el-table-column type="index" width="50" />
         <el-table-column prop="appointmentId" label="ID" width="90" />
         <el-table-column prop="date" label="日期" />
         <el-table-column prop="providerName" label="医生/机构" />
         <el-table-column prop="type" label="类型" width="100" />
-        <el-table-column label="操作" width="160">
+        <el-table-column label="状态" width="100">
           <template #default="{ row }">
-            <el-button size="small" @click="openCancel(row)">取消</el-button>
+            <el-tag :type="mapStatusType(row.status)">{{ row.status || 'UNKNOWN' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="210">
+          <template #default="{ row }">
+            <el-button size="small" @click="openCancel(row)" :disabled="row.status==='cancelled'">取消</el-button>
             <el-button size="small" type="danger" @click="deleteAppointment(row.appointmentId)">删除</el-button>
           </template>
         </el-table-column>
@@ -66,16 +71,19 @@
   </div>
 </template>
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useAppointmentStore } from '../stores/appointmentStore'
 import { useUserStore } from '../stores/userStore'
 import SectionCard from '../components/SectionCard.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
+import { formatDateTime } from '../utils/dateUtils'
+import { useNotificationStore } from '../stores/notificationStore'
 export default {
   components:{ SectionCard, LoadingSpinner },
   setup() {
     const appointmentStore = useAppointmentStore()
     const userStore = useUserStore()
+    const ns = useNotificationStore()
     const loading = ref(false)
     const creating = ref(false)
     const cancelling = ref(false)
@@ -85,15 +93,17 @@ export default {
     const getUserId = () => userStore.user?.userId || 1
     const refresh = async () => { loading.value=true; try { await appointmentStore.fetchAppointments(getUserId()) } finally { loading.value=false } }
     const reset = () => { form.providerLicense=''; form.datetime=''; form.type=''; form.memo='' }
-    const create = () => { formRef.value.validate(async valid => { if(!valid) return; creating.value=true; try { await appointmentStore.createAppointment({ userId:getUserId(), providerLicense:form.providerLicense, date:form.datetime, type:form.type, memo:form.memo }) ; reset(); refresh() } finally { creating.value=false } }) }
-    const deleteAppointment = async (id) => { await appointmentStore.deleteAppointment(id); refresh() }
+    const create = () => { formRef.value.validate(async valid => { if(!valid) return; creating.value=true; try { await appointmentStore.createAppointment({ userId:getUserId(), providerLicense:form.providerLicense, date:form.datetime, type:form.type, memo:form.memo }) ; ns.push('success','预约创建成功'); reset(); refresh() } finally { creating.value=false } }) }
+    const deleteAppointment = async (id) => { await appointmentStore.deleteAppointment(id); ns.push('info','预约已删除'); refresh() }
     const cancelDialogVisible = ref(false)
     const cancelForm = reactive({ reason:'', memo:'' })
     const targetCancelAppointmentId = ref(null)
     const openCancel = (row) => { targetCancelAppointmentId.value = row.appointmentId; cancelDialogVisible.value=true }
-    const confirmCancel = async () => { cancelling.value=true; try { /* 调用后端取消接口: appointmentStore.updateAppointment(...) 加 reason */ await appointmentStore.updateAppointment(targetCancelAppointmentId.value, { status:'CANCELLED', cancelReason:cancelForm.reason, cancelMemo:cancelForm.memo }) ; cancelDialogVisible.value=false; refresh() } finally { cancelling.value=false } }
+    const confirmCancel = async () => { cancelling.value=true; try { await appointmentStore.updateAppointment(targetCancelAppointmentId.value, { status:'cancelled', cancelReason:cancelForm.reason, cancelMemo:cancelForm.memo }) ; ns.push('warning','预约已取消'); cancelDialogVisible.value=false; refresh() } finally { cancelling.value=false } }
+    const formattedAppointments = computed(()=> appointmentStore.appointments.map(a => ({ ...a, date: formatDateTime(a.date || a.scheduledAt) })))
+    const mapStatusType = (s) => ({ scheduled:'', cancelled:'warning', completed:'success', no_show:'danger' }[s] || '')
     onMounted(refresh)
-    return { appointmentStore, loading, creating, form, rules, formRef, create, reset, refresh, deleteAppointment, cancelDialogVisible, cancelForm, openCancel, confirmCancel, cancelling }
+    return { appointmentStore, loading, creating, form, rules, formRef, create, reset, refresh, deleteAppointment, cancelDialogVisible, cancelForm, openCancel, confirmCancel, cancelling, formattedAppointments, mapStatusType }
   }
 }
 </script>

@@ -1,63 +1,41 @@
 import http from './http'
 
 export default {
-    // 获取用户某时间范围健康记录
-    getHealthRecords(userId, startDate, endDate) {
-        return http.get('/health/records', {
-            params: { userId, startDate, endDate }
-        })
+    // 健康记录模块（/api/health-records）
+
+    // 为指定用户创建健康记录
+    createRecord(userId, data) {
+        return http.post(`/health-records/${userId}`, data).then(res => res.data)
     },
 
-    // 创建健康记录
-    createRecord(data) {
-        return http.post('/health/records', data)
+    // 获取某用户的健康记录列表
+    getHealthRecords(userId) {
+        return http.get(`/health-records/${userId}`).then(res => res.data)
     },
 
-    // 更新健康记录
-    updateRecord(recordId, data) {
-        return http.put(`/health/records/${recordId}`, data)
+    // 更新健康记录（请求体带 id）
+    updateRecord(data) {
+        return http.put('/health-records', data).then(res => res.data)
     },
 
     // 删除健康记录
     deleteRecord(recordId) {
-        return http.delete(`/health/records/${recordId}`)
+        return http.delete(`/health-records/${recordId}`).then(res => res.data)
     },
 
-    // ===============================
-    // 🟦 Monthly Summary（月度摘要）
-    // ===============================
+    // MonthlySummary 子模块（/api/health-records/summary）
 
-    // 获取某月的摘要
-    getMonthlySummary(userId, year, month) {
-        return http.get('/health/summary', {
-            params: { userId, year, month }
-        })
+    // 添加月度汇总
+    addMonthlySummary(userId, year, month, metricsJson) {
+        // metricsJson 是字符串（可以是 JSON 文本）
+        return http.post(`/health-records/summary/${userId}`, metricsJson, {
+            params: { year, month },
+            headers: { 'Content-Type': 'application/json' },
+        }).then(res => res.data)
     },
 
-    // 后端生成（或刷新）月度摘要
-    generateMonthlySummary(userId, year, month) {
-        return http.post('/health/summary/generate', {
-            userId,
-            year,
-            month
-        })
+    // 获取某用户的月度汇总列表
+    getMonthlySummaries(userId) {
+        return http.get(`/health-records/summary/${userId}`).then(res => res.data)
     },
-
-    // ===============================
-    // 🟩 健康记录搜索（用于 Search.vue）
-    // ===============================
-
-    searchHealthRecords(params) {
-        return http.get('/health/search', { params })
-    },
-
-    // 获取最活跃用户（摘要需求）
-    getMostActiveUser() {
-        return http.get('/health/stats/most-active-user')
-    },
-
-    // 获取参与最多的健康挑战（摘要需求）
-    getTopChallenge() {
-        return http.get('/health/stats/top-challenge')
-    }
 }

@@ -39,21 +39,23 @@ import { ref, onMounted } from 'vue'
 import { useFamilyStore } from '../stores/familyStore'
 import { useUserStore } from '../stores/userStore'
 import SectionCard from '../components/SectionCard.vue'
+import { useNotificationStore } from '../stores/notificationStore'
 export default {
   components:{ SectionCard },
   setup() {
     const familyStore = useFamilyStore()
     const userStore = useUserStore()
+    const ns = useNotificationStore()
     const newGroupName = ref('')
     const newMemberUserId = ref('')
     const currentGroup = ref(null)
     const members = ref([])
     const getUserId = () => userStore.user?.userId || 1
     const refresh = async () => { await familyStore.fetchGroups(getUserId()) }
-    const createGroup = async () => { if(!newGroupName.value) return; await familyStore.createGroup({ name:newGroupName.value }); newGroupName.value=''; refresh() }
+    const createGroup = async () => { if(!newGroupName.value) return; await familyStore.createGroup({ name:newGroupName.value }); ns.push('success','家庭组已创建'); newGroupName.value=''; refresh() }
     const selectGroup = async (row) => { currentGroup.value = row; const detail = await familyStore.fetchGroupDetail(row.groupId); members.value = detail.members || [] }
-    const addMember = async () => { if(!currentGroup.value) return; const added = await familyStore.addMember(currentGroup.value.groupId, newMemberUserId.value); members.value.push(added); newMemberUserId.value='' }
-    const removeMember = async (memberId) => { await familyStore.removeMember(memberId); members.value = members.value.filter(m=>m.memberId!==memberId) }
+    const addMember = async () => { if(!currentGroup.value) return; const added = await familyStore.addMember(currentGroup.value.groupId, newMemberUserId.value); members.value.push(added); ns.push('success','成员已添加'); newMemberUserId.value='' }
+    const removeMember = async (memberId) => { await familyStore.removeMember(memberId); members.value = members.value.filter(m=>m.memberId!==memberId); ns.push('warning','成员已移除') }
     onMounted(refresh)
     return { familyStore, newGroupName, createGroup, currentGroup, selectGroup, newMemberUserId, addMember, removeMember, members }
   }

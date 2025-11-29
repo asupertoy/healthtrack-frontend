@@ -3,19 +3,21 @@ import healthApi from '../api/healthApi'
 
 export const useHealthStore = defineStore('health', {
     state: () => ({
-        monthlySummary: null,
+        monthlySummaries: [],
         healthRecords: [],
         loading: false,
-        error: null
+        error: null,
     }),
 
     actions: {
-        async fetchMonthlySummary(userId, year, month) {
+        // 获取某用户所有月度汇总，然后前端可以按 year/month 过滤
+        async fetchMonthlySummaries(userId) {
             this.loading = true
             this.error = null
             try {
-                this.monthlySummary = await healthApi.getMonthlySummary(userId, year, month)
-                return this.monthlySummary
+                const list = await healthApi.getMonthlySummaries(userId)
+                this.monthlySummaries = list
+                return list
             } catch (e) {
                 this.error = e.message
                 throw e
@@ -24,16 +26,17 @@ export const useHealthStore = defineStore('health', {
             }
         },
 
-        async generateMonthlySummary(userId, year, month) {
-            return await healthApi.generateMonthlySummary(userId, year, month)
+        async addMonthlySummary(userId, year, month, metricsJson) {
+            return await healthApi.addMonthlySummary(userId, year, month, metricsJson)
         },
 
-        async fetchHealthRecords(userId, startDate, endDate) {
+        async fetchHealthRecords(userId) {
             this.loading = true
             this.error = null
             try {
-                this.healthRecords = await healthApi.getHealthRecords(userId, startDate, endDate)
-                return this.healthRecords
+                const list = await healthApi.getHealthRecords(userId)
+                this.healthRecords = list
+                return list
             } catch (e) {
                 this.error = e.message
                 throw e
@@ -41,9 +44,5 @@ export const useHealthStore = defineStore('health', {
                 this.loading = false
             }
         },
-
-        async searchRecords(params) {
-            return await healthApi.searchHealthRecords(params)
-        }
     },
 })

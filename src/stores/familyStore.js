@@ -10,11 +10,11 @@ export const useFamilyStore = defineStore('familyStore', {
     }),
 
     actions: {
-        async fetchGroups(userId) {
+        async fetchGroups() {
             this.loading = true
             this.error = null
             try {
-                const data = await familyApi.getFamilyGroups(userId)
+                const data = await familyApi.getFamilyGroups()
                 this.groups = data
                 return data
             } catch (e) {
@@ -26,19 +26,19 @@ export const useFamilyStore = defineStore('familyStore', {
         },
 
         async fetchGroupDetail(groupId) {
-            const detail = await familyApi.getGroupDetail(groupId)
+            const detail = await familyApi.getFamilyGroup(groupId)
             this.members = detail.members || []
             return detail
         },
 
         async createGroup(payload) {
-            const data = await familyApi.createGroup(payload)
+            const data = await familyApi.createFamilyGroup(payload)
             this.groups.push(data)
             return data
         },
 
-        async addMember(groupId, userId) {
-            const data = await familyApi.addMember(groupId, userId)
+        async addMember(groupId, userId, role) {
+            const data = await familyApi.addMember(groupId, userId, role)
             this.members.push(data)
             return data
         },

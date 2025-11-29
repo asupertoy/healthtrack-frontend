@@ -1,6 +1,6 @@
 <template>
   <div>
-    <el-page-header content="账号信息" />
+    <el-page-header content="账户信息" />
     <el-tabs v-model="activeTab" class="account-tabs">
       <el-tab-pane label="基本资料" name="profile">
         <SectionCard title="基本资料">
@@ -92,10 +92,12 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useUserStore } from '../stores/userStore'
 import SectionCard from '../components/SectionCard.vue'
+import { useNotificationStore } from '../stores/notificationStore'
 export default {
   components:{ SectionCard },
   setup() {
     const userStore = useUserStore()
+    const ns = useNotificationStore()
     const activeTab = ref('profile')
     const profileForm = ref(null)
     const saving = ref(false)
@@ -119,16 +121,16 @@ export default {
       profileForm.value.validate(async valid => {
         if(!valid) return
         saving.value=true
-        try { await userStore.updateUser({ name:profile.name, primaryEmail:profile.primaryEmail, phone:profile.phone }) }
+        try { await userStore.updateUser({ name:profile.name, primaryEmail:profile.primaryEmail, phone:profile.phone }); ns.push('success','资料已保存') }
         finally { saving.value=false }
       })
     }
-    const addEmail = async () => { const added = await userStore.addEmail(newEmail.value); emails.value.push(added); newEmail.value='' }
-    const removeEmail = async (id) => { await userStore.removeEmail(id); emails.value = emails.value.filter(e=>e.emailId!==id) }
-    const addPhone = async () => { const added = await userStore.addPhone(newPhone.value); phones.value.push(added); newPhone.value='' }
-    const removePhone = async (id) => { await userStore.removePhone(id); phones.value = phones.value.filter(p=>p.phoneId!==id) }
-    const linkProvider = async () => { const linked = await userStore.linkProvider(newProviderId.value); providers.value.push(linked); newProviderId.value='' }
-    const unlinkProvider = async (linkId) => { await userStore.unlinkProvider(linkId); providers.value = providers.value.filter(p=>p.linkId!==linkId) }
+    const addEmail = async () => { const added = await userStore.addEmail(newEmail.value); emails.value.push(added); ns.push('success','邮箱已添加'); newEmail.value='' }
+    const removeEmail = async (id) => { await userStore.removeEmail(id); emails.value = emails.value.filter(e=>e.emailId!==id); ns.push('info','邮箱已删除') }
+    const addPhone = async () => { const added = await userStore.addPhone(newPhone.value); phones.value.push(added); ns.push('success','手机已添加'); newPhone.value='' }
+    const removePhone = async (id) => { await userStore.removePhone(id); phones.value = phones.value.filter(p=>p.phoneId!==id); ns.push('info','手机已删除') }
+    const linkProvider = async () => { const linked = await userStore.linkProvider(newProviderId.value); providers.value.push(linked); ns.push('success','已关联提供者'); newProviderId.value='' }
+    const unlinkProvider = async (linkId) => { await userStore.unlinkProvider(linkId); providers.value = providers.value.filter(p=>p.linkId!==linkId); ns.push('warning','已解除关联') }
     onMounted(reloadProfile)
     return { activeTab, profile, profileRules, profileForm, saveProfile, reloadProfile, saving,
       newEmail, newPhone, newProviderId, emails, phones, providers,

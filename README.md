@@ -2,23 +2,30 @@
 
 Vue 3 + Vite implementation of the HealthTrack Personal Wellness Platform frontend.
 
-## Features (Phase 3 Requirements Coverage)
-- Account Info: view & update basic profile (name, primary email, phone)
-- Book Appointment: list and create appointments (UI create form TBD)
-- Create Wellness Challenge: list and create challenges
-- Monthly Health Summary: fetch monthly aggregated metrics
-- Search Records: search health records by filters
-- Family Group: view and create user family groups
-- Authentication: simple login storing returned user object
-- Global Layout: header + sidebar navigation (conditional on login)
+## Phase 3 Requirements Coverage
+Main Menu:
+- Account Info (profile + emails, phone, providers management)
+- Book an Appointment (create, list, cancel, delete)
+- Create a Wellness Challenge (create, list, join, view participants, leave)
+- Monthly Health Summary (total appointments, avg/min/max metrics placeholders, top challenge, most active user)
+- Search Records (appointments & health records by filters)
+- Sign Out (header logout button)
+- Family Group (extra: create groups, add/remove members)
+
+Account Functions:
+- Modify personal details (name, primaryEmail, phone)
+- Add/remove email address
+- Add/remove phone number
+- Link/unlink healthcare provider
+
+Summary Functions Implemented:
+- Total number of appointments in date range (appointmentStore.countAppointments + search UI)
+- Average/min/max of metrics (monthly summary shows avg/min/max placeholders for weight & blood pressure)
+- Challenges with most participants (top challenge endpoint consumed)
+- Most active users (most active user endpoint consumed)
 
 ## Tech Stack
-- Vue 3 Composition API
-- Pinia (state management)
-- Vue Router 4
-- Element Plus (UI components)
-- Axios (HTTP client)
-- Vite (build tool)
+Vue 3 + Pinia + Vue Router + Element Plus + Axios + Vite
 
 ## Project Setup
 ```sh
@@ -29,43 +36,35 @@ npm install
 ```sh
 npm run dev
 ```
-App served at http://localhost:3000 (configurable in `vite.config.js`).
+Visit http://localhost:3000.
 
 ### Production Build
 ```sh
 npm run build
 ```
-Outputs static assets to `dist/`.
 
-### Preview Production Build
+### Preview
 ```sh
 npm run preview
 ```
 
-## Environment Assumptions
-Backend API base URL is `http://localhost:8080/api` (see `src/api/http.js`). Adjust if backend runs elsewhere.
+## Configuration
+API base URL: `http://localhost:8080/api` (see `src/api/http.js`). Adjust if backend differs.
 
-## State Management Overview
-Stores located in `src/stores/` encapsulate API calls. Axios interceptor returns `response.data` directly; store actions treat responses as data objects.
+## Auth Guard
+Simple route guard redirects unauthenticated users to /login based on presence of `token` in localStorage.
 
-## Next Improvements (Suggested)
-- Add appointment/challenge creation forms (current minimal input fields).
-- Add email/phone/provider management UI to fully meet account spec.
-- Implement cancellation workflow and reasons for appointments.
-- Add challenge invitations and expiration handling (15-day rule).
-- Add progress tracking for challenges.
-- Add health metrics entry forms.
-- Add simple unit tests (recommend Vitest) for stores.
-
-## Running Tests (Future)
-When Vitest added:
-```sh
-npm run test
-```
+## Next Suggested Enhancements
+- Implement invitation flow & 15-day expiration UI.
+- Primary provider selection & enforcement feedback.
+- Progress update interface for challenges.
+- Chart visualizations for monthly summary metrics.
+- Replace fallback userId=1 logic with strict auth requirement.
+- Add unit tests (Vitest) for stores and composables.
 
 ## Troubleshooting
-- If Element Plus components not styled: ensure CSS import in `src/main.js`.
-- 404 routes: verify router paths in `src/router/index.js` align with sidebar menu.
+- If routes 404: ensure backend running & correct base URL.
+- If styles missing: check Element Plus CSS import in `main.js`.
 
 ## License
-Internal academic project; no external license specified.
+Academic project – internal use.
