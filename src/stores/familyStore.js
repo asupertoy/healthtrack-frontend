@@ -6,7 +6,7 @@ export const useFamilyStore = defineStore('familyStore', {
         groups: [],
         members: [],
         loading: false,
-        error: null
+        error: null,
     }),
 
     actions: {
@@ -37,7 +37,7 @@ export const useFamilyStore = defineStore('familyStore', {
             return data
         },
 
-        async addMember(groupId, userId, role) {
+        async addMember(groupId, userId, role = 'MEMBER') {
             const data = await familyApi.addMember(groupId, userId, role)
             this.members.push(data)
             return data
@@ -46,6 +46,6 @@ export const useFamilyStore = defineStore('familyStore', {
         async removeMember(memberId) {
             await familyApi.removeMember(memberId)
             this.members = this.members.filter(m => m.memberId !== memberId)
-        }
-    }
+        },
+    },
 })

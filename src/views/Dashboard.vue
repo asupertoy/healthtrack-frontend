@@ -7,16 +7,16 @@
         <div class="value">{{ currentUser?.name || '未登录' }}</div>
       </el-card>
       <el-card class="stat" shadow="never">
-        <div class="label">最活跃用户</div>
-        <div class="value">{{ mostActiveUser?.name || '-' }}</div>
-      </el-card>
-      <el-card class="stat" shadow="never">
-        <div class="label">热门挑战</div>
-        <div class="value">{{ topChallenge?.title || '-' }}</div>
-      </el-card>
-      <el-card class="stat" shadow="never">
         <div class="label">本月预约数</div>
-        <div class="value">{{ monthlySummary?.totalAppointments || 0 }}</div>
+        <div class="value">{{ currentMonthAppointments }}</div>
+      </el-card>
+      <el-card class="stat" shadow="never">
+        <div class="label">健康记录条数</div>
+        <div class="value">{{ healthRecordCount }}</div>
+      </el-card>
+      <el-card class="stat" shadow="never">
+        <div class="label">月度汇总条数</div>
+        <div class="value">{{ monthlySummaryCount }}</div>
       </el-card>
     </div>
     <div class="actions">
@@ -26,33 +26,63 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useUserStore } from '../stores/userStore'
-import healthApi from '../api/healthApi'
 import { useHealthStore } from '../stores/healthStore'
+import { useAppointmentStore } from '../stores/appointmentStore'
+
 export default {
   name: 'Dashboard',
-  setup(){
+  setup() {
     const userStore = useUserStore()
     const healthStore = useHealthStore()
-    const mostActiveUser = ref(null)
-    const topChallenge = ref(null)
-    const monthlySummary = ref(null)
+    const appointmentStore = useAppointmentStore()
     const loading = ref(false)
     const now = new Date()
+
     const refresh = async () => {
-      loading.value=true
+      loading.value = true
       try {
-        try { mostActiveUser.value = await healthApi.getMostActiveUser() } catch(e){}
-        try { topChallenge.value = await healthApi.getTopChallenge() } catch(e){}
-        if(userStore.user?.userId){
-          monthlySummary.value = await healthStore.fetchMonthlySummary(userStore.user.userId, now.getFullYear(), now.getMonth()+1)
+        const userId = userStore.user?.userId || userStore.userId
+        if (userId) {
+          // 拉取健康记录和月度汇总
+          await Promise.all([
+            healthStore.fetchHealthRecords(userId),
+            healthStore.fetchMonthlySummaries(userId),
+            appointmentStore.fetchAppointments(),
+          ])
         }
-      } finally { loading.value=false }
+      } finally {
+        loading.value = false
+      }
     }
+
+    const currentUser = computed(() => userStore.user)
+
+    const currentMonthAppointments = computed(() => {
+      const year = now.getFullYear()
+      const month = now.getMonth() + 1
+      const list = appointmentStore.appointments || []
+      return list.filter(a => {
+        const d = new Date(a.scheduledAt || a.date || a.createdAt)
+        return d.getFullYear() === year && d.getMonth() + 1 === month
+      }).length
+    })
+
+    const healthRecordCount = computed(() => healthStore.healthRecords.length)
+    const monthlySummaryCount = computed(() => healthStore.monthlySummaries.length)
+
     refresh()
-    return { currentUser:userStore.user, mostActiveUser, topChallenge, monthlySummary, loading, refresh }
-  }
+
+    return {
+      currentUser,
+      currentMonthAppointments,
+      healthRecordCount,
+      monthlySummaryCount,
+      loading,
+      refresh,
+    }
+  },
 }
 </script>
 

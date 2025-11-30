@@ -25,6 +25,7 @@
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="handleLogin">登录</el-button>
           <el-button @click="reset">重置</el-button>
+          <el-button type="text" @click="goRegister">没有账号？去注册</el-button>
         </el-form-item>
         <el-alert v-if="error" :title="error" type="error" show-icon class="error-alert" />
       </el-form>
@@ -78,7 +79,11 @@ export default {
       })
     }
 
-    return { form, rules, formRef, error, loading, handleLogin, reset }
+    const goRegister = () => {
+      router.push('/register')
+    }
+
+    return { form, rules, formRef, error, loading, handleLogin, reset, goRegister }
   },
 }
 </script>

@@ -78,8 +78,9 @@ import SectionCard from '../components/SectionCard.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 import { formatDateTime } from '../utils/dateUtils'
 import { useNotificationStore } from '../stores/notificationStore'
+
 export default {
-  components:{ SectionCard, LoadingSpinner },
+  components: { SectionCard, LoadingSpinner },
   setup() {
     const appointmentStore = useAppointmentStore()
     const userStore = useUserStore()
@@ -88,23 +89,139 @@ export default {
     const creating = ref(false)
     const cancelling = ref(false)
     const formRef = ref(null)
-    const form = reactive({ providerLicense:'', datetime:'', type:'', memo:'' })
-    const rules = { providerLicense:[{required:true,message:'必填',trigger:'blur'}], datetime:[{required:true,message:'请选择时间',trigger:'change'}], type:[{required:true,message:'选择类型',trigger:'change'}] }
-    const getUserId = () => userStore.user?.userId || 1
-    const refresh = async () => { loading.value=true; try { await appointmentStore.fetchAppointments(getUserId()) } finally { loading.value=false } }
-    const reset = () => { form.providerLicense=''; form.datetime=''; form.type=''; form.memo='' }
-    const create = () => { formRef.value.validate(async valid => { if(!valid) return; creating.value=true; try { await appointmentStore.createAppointment({ userId:getUserId(), providerLicense:form.providerLicense, date:form.datetime, type:form.type, memo:form.memo }) ; ns.push('success','预约创建成功'); reset(); refresh() } finally { creating.value=false } }) }
-    const deleteAppointment = async (id) => { await appointmentStore.deleteAppointment(id); ns.push('info','预约已删除'); refresh() }
+    const form = reactive({ providerLicense: '', datetime: '', type: '', memo: '' })
+    const rules = {
+      providerLicense: [{ required: true, message: '必填', trigger: 'blur' }],
+      datetime: [{ required: true, message: '请选择时间', trigger: 'change' }],
+      type: [{ required: true, message: '选择类型', trigger: 'change' }],
+    }
+
+    const getUserId = () => userStore.user?.userId || localStorage.getItem('userId') || 1
+
+    const refresh = async () => {
+      loading.value = true
+      try {
+        // 后端 /api/appointments 默认按当前登录用户过滤，这里不传多余 params
+        await appointmentStore.fetchAppointments()
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || '加载预约失败')
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const reset = () => {
+      form.providerLicense = ''
+      form.datetime = ''
+      form.type = ''
+      form.memo = ''
+    }
+
+    const create = () => {
+      formRef.value.validate(async valid => {
+        if (!valid) return
+        creating.value = true
+        try {
+          const userId = getUserId()
+          // 按后端示例构造 Appointment JSON
+          await appointmentStore.createAppointment({
+            bookingUser: { userId },
+            provider: { providerId: null }, // 如果前端有 providerId，可替换 null
+            providerEmail: null,
+            providerLicense: form.providerLicense,
+            scheduledAt: form.datetime,
+            consultationType: form.type,
+            memo: form.memo,
+          })
+          ns.push('success', '预约创建成功')
+          reset()
+          refresh()
+        } catch (e) {
+          ns.push('error', e?.response?.data?.message || e.message || '创建预约失败')
+        } finally {
+          creating.value = false
+        }
+      })
+    }
+
+    const deleteAppointment = async id => {
+      try {
+        await appointmentStore.deleteAppointment(id)
+        ns.push('info', '预约已删除')
+        refresh()
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || '删除预约失败')
+      }
+    }
+
     const cancelDialogVisible = ref(false)
-    const cancelForm = reactive({ reason:'', memo:'' })
-    const targetCancelAppointmentId = ref(null)
-    const openCancel = (row) => { targetCancelAppointmentId.value = row.appointmentId; cancelDialogVisible.value=true }
-    const confirmCancel = async () => { cancelling.value=true; try { await appointmentStore.updateAppointment(targetCancelAppointmentId.value, { status:'cancelled', cancelReason:cancelForm.reason, cancelMemo:cancelForm.memo }) ; ns.push('warning','预约已取消'); cancelDialogVisible.value=false; refresh() } finally { cancelling.value=false } }
-    const formattedAppointments = computed(()=> appointmentStore.appointments.map(a => ({ ...a, date: formatDateTime(a.date || a.scheduledAt) })))
-    const mapStatusType = (s) => ({ scheduled:'', cancelled:'warning', completed:'success', no_show:'danger' }[s] || '')
+    const cancelForm = reactive({ reason: '', memo: '' })
+    const targetCancelAppointment = ref(null)
+
+    const openCancel = row => {
+      targetCancelAppointment.value = row
+      cancelForm.reason = ''
+      cancelForm.memo = ''
+      cancelDialogVisible.value = true
+    }
+
+    const confirmCancel = async () => {
+      if (!targetCancelAppointment.value) return
+      cancelling.value = true
+      try {
+        // 根据当前预约构造完整更新对象（至少要带 appointmentId，其他字段按后端要求）
+        const updated = {
+          ...targetCancelAppointment.value,
+          status: 'CANCELLED',
+          cancelReason: cancelForm.reason,
+          cancelMemo: cancelForm.memo,
+        }
+        await appointmentStore.updateAppointment(updated)
+        ns.push('warning', '预约已取消')
+        cancelDialogVisible.value = false
+        refresh()
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || '取消预约失败')
+      } finally {
+        cancelling.value = false
+      }
+    }
+
+    const formattedAppointments = computed(() =>
+      appointmentStore.appointments.map(a => ({
+        ...a,
+        date: formatDateTime(a.scheduledAt || a.date),
+      }))
+    )
+
+    const mapStatusType = s => ({
+      SCHEDULED: '',
+      CANCELLED: 'warning',
+      COMPLETED: 'success',
+      NO_SHOW: 'danger',
+    }[s] || '')
+
     onMounted(refresh)
-    return { appointmentStore, loading, creating, form, rules, formRef, create, reset, refresh, deleteAppointment, cancelDialogVisible, cancelForm, openCancel, confirmCancel, cancelling, formattedAppointments, mapStatusType }
-  }
+    return {
+      appointmentStore,
+      loading,
+      creating,
+      form,
+      rules,
+      formRef,
+      create,
+      reset,
+      refresh,
+      deleteAppointment,
+      cancelDialogVisible,
+      cancelForm,
+      openCancel,
+      confirmCancel,
+      cancelling,
+      formattedAppointments,
+      mapStatusType,
+    }
+  },
 }
 </script>
 <style scoped>

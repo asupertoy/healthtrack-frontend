@@ -7,6 +7,12 @@ export default {
         return http.post('/auth/login', payload).then(res => res.data)
     },
 
+    // 注册（healthId + name + phone + email + password）
+    register(payload) {
+        // payload: { healthId, name, phone, email?, password }
+        return http.post('/auth/register', payload).then(res => res.data)
+    },
+
     // 刷新 token
     refresh(data) {
         // data: { refreshToken }
