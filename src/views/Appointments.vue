@@ -1,23 +1,56 @@
 <template>
   <div>
-    <el-page-header content="预约管理" />
+    <el-page-header content="预约管理" @back="handleBack" />
     <SectionCard title="创建预约">
       <el-form :model="form" label-width="110px" ref="formRef" :rules="rules" class="create-form">
-        <el-form-item label="提供者执照号" prop="providerLicense">
-          <el-input v-model="form.providerLicense" placeholder="例如: DOC-123" />
-        </el-form-item>
-        <el-form-item label="日期时间" prop="datetime">
-          <el-date-picker v-model="form.datetime" type="datetime" placeholder="选择日期时间" style="width:100%" />
-        </el-form-item>
-        <el-form-item label="类型" prop="type">
-          <el-select v-model="form.type" placeholder="选择类型">
-            <el-option label="面诊" value="IN_PERSON" />
-            <el-option label="视频" value="VIRTUAL" />
+        <!-- 预约对象：bookingUser 由当前登录用户决定，不在表单中输入 -->
+
+        <!-- 医生：从已有医生列表按名字选择 -->
+        <el-form-item label="医生" prop="providerId">
+          <el-select
+            v-model="form.providerId"
+            filterable
+            placeholder="请选择医生"
+            :loading="providersLoading"
+          >
+            <el-option
+              v-for="p in providers"
+              :key="p.providerId"
+              :label="p.name || (p.licenseNumber || p.email)"
+              :value="p.providerId"
+            />
           </el-select>
         </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="form.memo" type="textarea" :rows="2" placeholder="症状或问题（可选）" />
+
+        <!-- 必填：预约时间 -->
+        <el-form-item label="日期时间" prop="datetime">
+          <el-date-picker
+            v-model="form.datetime"
+            type="datetime"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            placeholder="选择日期时间"
+            style="width:100%"
+          />
         </el-form-item>
+
+        <!-- 必填：面诊/视频 -->
+        <el-form-item label="类型" prop="type">
+          <el-select v-model="form.type" placeholder="选择类型">
+            <el-option label="线下就诊" value="IN_PERSON" />
+            <el-option label="线上就诊" value="VIRTUAL" />
+          </el-select>
+        </el-form-item>
+
+        <!-- 备注 -->
+        <el-form-item label="备注">
+          <el-input
+            v-model="form.memo"
+            type="textarea"
+            :rows="2"
+            placeholder="症状、就诊目的等（可选）"
+          />
+        </el-form-item>
+
         <el-form-item>
           <el-button type="primary" :loading="creating" @click="create">创建</el-button>
           <el-button @click="reset">重置</el-button>
@@ -32,56 +65,61 @@
       <LoadingSpinner :visible="loading" text="加载中..." />
       <el-table :data="formattedAppointments" v-loading="loading" size="small" style="width:100%;" empty-text="暂无预约">
         <el-table-column type="index" width="50" />
-        <el-table-column prop="appointmentId" label="ID" width="90" />
-        <el-table-column prop="date" label="日期" />
-        <el-table-column prop="providerName" label="医生/机构" />
-        <el-table-column prop="type" label="类型" width="100" />
-        <el-table-column label="状态" width="100">
+        <!-- 医生姓名 -->
+        <el-table-column prop="providerName" label="医生姓名" width="200"/>
+        <!-- 预约时间（scheduledAt 格式化后） -->
+        <el-table-column prop="date" label="预约时间" />
+        <!-- 线上 / 线下 -->
+        <el-table-column label="类型" width="120">
           <template #default="{ row }">
-            <el-tag :type="mapStatusType(row.status)">{{ row.status || 'UNKNOWN' }}</el-tag>
+            {{ row.consultationType === 'VIRTUAL' ? '线上就诊' : '线下就诊' }}
           </template>
         </el-table-column>
+        <!-- 备注 memo -->
+        <el-table-column prop="memo" label="备注" />
+        <!-- 状态 -->
+        <el-table-column label="预约状态" width="120">
+          <template #default="{ row }">
+            <template v-if="row.statusType">
+              <el-tag :type="row.statusType">{{ row.status || 'UNKNOWN' }}</el-tag>
+            </template>
+            <template v-else>
+              <el-tag>{{ row.status || 'UNKNOWN' }}</el-tag>
+            </template>
+          </template>
+        </el-table-column>
+        <!-- 创建时间 -->
+        <el-table-column prop="createdAtFormatted" label="创建时间" />
         <el-table-column label="操作" width="210">
           <template #default="{ row }">
-            <el-button size="small" @click="openCancel(row)" :disabled="row.status==='cancelled'">取消</el-button>
-            <el-button size="small" type="danger" @click="deleteAppointment(row.appointmentId)">删除</el-button>
+            <el-button size="small" @click="openCancel(row)" :disabled="(row.status || '').toString().toUpperCase() === 'CANCELLED'">取消</el-button>
           </template>
         </el-table-column>
       </el-table>
     </SectionCard>
-
-    <el-dialog v-model="cancelDialogVisible" title="取消预约" width="420px">
-      <el-form :model="cancelForm" label-width="100px">
-        <el-form-item label="原因" prop="reason">
-          <el-select v-model="cancelForm.reason" placeholder="选择取消原因">
-            <el-option label="患者改期" value="PATIENT_RESCHEDULE" />
-            <el-option label="医生无法应诊" value="PROVIDER_UNAVAILABLE" />
-            <el-option label="其他" value="OTHER" />
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="cancelForm.reason === 'OTHER'" label="备注">
-          <el-input v-model="cancelForm.memo" type="textarea" :rows="3" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="cancelDialogVisible=false">关闭</el-button>
-        <el-button type="primary" :loading="cancelling" @click="confirmCancel">确认取消</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAppointmentStore } from '../stores/appointmentStore'
 import { useUserStore } from '../stores/userStore'
 import SectionCard from '../components/SectionCard.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
-import { formatDateTime } from '../utils/dateUtils'
+import { formatLocalDateTime } from '../utils/dateUtils'
 import { useNotificationStore } from '../stores/notificationStore'
+import providerApi from '../api/providerApi'
+import appointmentApi from '../api/appointmentApi'
+import { ElMessageBox } from 'element-plus'
 
 export default {
   components: { SectionCard, LoadingSpinner },
   setup() {
+    const router = useRouter()
+    const handleBack = () => {
+      router.back()
+    }
+
     const appointmentStore = useAppointmentStore()
     const userStore = useUserStore()
     const ns = useNotificationStore()
@@ -89,20 +127,36 @@ export default {
     const creating = ref(false)
     const cancelling = ref(false)
     const formRef = ref(null)
-    const form = reactive({ providerLicense: '', datetime: '', type: '', memo: '' })
+    const form = reactive({
+      providerId: null,
+      // 直接使用字符串形式的本地时间，如 '2025-12-02T10:30:00'
+      datetime: '',
+      type: '',
+      memo: '',
+    })
     const rules = {
-      providerLicense: [{ required: true, message: '必填', trigger: 'blur' }],
+      providerId: [{ required: true, message: '请选择医生', trigger: 'change' }],
       datetime: [{ required: true, message: '请选择时间', trigger: 'change' }],
       type: [{ required: true, message: '选择类型', trigger: 'change' }],
     }
+
+    // 医生列表数据源（供创建预约时选择）
+    const providers = ref([])
+    const providersLoading = ref(false)
+
+    // 缓存已加载的 Provider，key 为 providerId
+    const providerCache = ref({})
+    // 映射 appointmentId -> providerName，便于在表格中展示
+    const providerNames = ref({})
 
     const getUserId = () => userStore.user?.userId || localStorage.getItem('userId') || 1
 
     const refresh = async () => {
       loading.value = true
       try {
-        // 后端 /api/appointments 默认按当前登录用户过滤，这里不传多余 params
         await appointmentStore.fetchAppointments()
+        // 加载完预约后，根据 providerId 预取医生姓名
+        await preloadProviderNames()
       } catch (e) {
         ns.push('error', e?.response?.data?.message || e.message || '加载预约失败')
       } finally {
@@ -110,121 +164,211 @@ export default {
       }
     }
 
+    const loadProviders = async () => {
+      providersLoading.value = true
+      try {
+        // 获取所有 Provider 列表，让用户按名字选择
+        providers.value = await providerApi.getProviders?.() || []
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || '加载医生列表失败')
+      } finally {
+        providersLoading.value = false
+      }
+    }
+
     const reset = () => {
-      form.providerLicense = ''
+      form.providerId = null
       form.datetime = ''
       form.type = ''
       form.memo = ''
     }
 
-    const create = () => {
-      formRef.value.validate(async valid => {
+    const create = async () => {
+      // Manual validation first (always reliable)
+      const missing = []
+      if (!form.providerId) missing.push('医生')
+      if (!form.datetime) missing.push('日期时间')
+      if (!form.type) missing.push('类型')
+      if (missing.length) {
+        ns.push('error', `请填写：${missing.join('、')}`)
+        return
+      }
+
+      // If Element Plus formRef exists, use it to show UI validation feedback
+      if (formRef.value && typeof formRef.value.validate === 'function') {
+        const valid = await new Promise(resolve => {
+          formRef.value.validate(res => resolve(res))
+        })
         if (!valid) return
-        creating.value = true
-        try {
-          const userId = getUserId()
-          // 按后端示例构造 Appointment JSON
-          await appointmentStore.createAppointment({
-            bookingUser: { userId },
-            provider: { providerId: null }, // 如果前端有 providerId，可替换 null
-            providerEmail: null,
-            providerLicense: form.providerLicense,
-            scheduledAt: form.datetime,
-            consultationType: form.type,
-            memo: form.memo,
-          })
-          ns.push('success', '预约创建成功')
-          reset()
-          refresh()
-        } catch (e) {
-          ns.push('error', e?.response?.data?.message || e.message || '创建预约失败')
-        } finally {
-          creating.value = false
+      }
+
+      creating.value = true
+      try {
+        const userId = getUserId()
+
+        // scheduledAt 现在直接使用 form.datetime 字符串（已是 'YYYY-MM-DDTHH:mm:ss' 本地时间）
+        const scheduledAt = form.datetime
+
+        const payload = {
+          bookingUserId: userId,
+          providerId: form.providerId,
+          scheduledAt,
+          consultationType: form.type, // 'IN_PERSON' 或 'VIRTUAL'
+          memo: form.memo || null,
         }
-      })
+
+        console.log('Create appointment payload (CreateAppointmentRequest):', payload)
+        await appointmentStore.createAppointment(payload)
+        ns.push('success', '预约创建成功')
+        reset()
+        await refresh()
+      } catch (e) {
+        console.error('Create appointment failed:', {
+          status: e?.response?.status,
+          data: e?.response?.data,
+          message: e?.message,
+        })
+        const serverMsg = e?.response?.data?.message || e?.response?.data || e.message || '创建预约失败'
+        ns.push('error', serverMsg)
+      } finally {
+        creating.value = false
+      }
     }
 
     const deleteAppointment = async id => {
       try {
         await appointmentStore.deleteAppointment(id)
         ns.push('info', '预约已删除')
-        refresh()
+        await refresh()
       } catch (e) {
         ns.push('error', e?.response?.data?.message || e.message || '删除预约失败')
       }
     }
 
-    const cancelDialogVisible = ref(false)
-    const cancelForm = reactive({ reason: '', memo: '' })
-    const targetCancelAppointment = ref(null)
+    const openCancel = async row => {
+      if (!row || !row.appointmentId) return
 
-    const openCancel = row => {
-      targetCancelAppointment.value = row
-      cancelForm.reason = ''
-      cancelForm.memo = ''
-      cancelDialogVisible.value = true
-    }
+      // 1) 让用户输入可选的取消原因
+      let reason
+      try {
+        const res = await ElMessageBox.prompt('请输入取消原因（可留空）', '确认取消预约', {
+          confirmButtonText: '确认',
+          cancelButtonText: '取消',
+          inputPlaceholder: '可留空',
+          inputType: 'text',
+        })
+        reason = res?.value ?? null
+      } catch {
+        // 用户取消输入
+        return
+      }
 
-    const confirmCancel = async () => {
-      if (!targetCancelAppointment.value) return
       cancelling.value = true
       try {
-        // 根据当前预约构造完整更新对象（至少要带 appointmentId，其他字段按后端要求）
-        const updated = {
-          ...targetCancelAppointment.value,
-          status: 'CANCELLED',
-          cancelReason: cancelForm.reason,
-          cancelMemo: cancelForm.memo,
+        // 2) 构造 CancelAppointmentRequest 请求体
+        const body = {
+          // 可选：你可以不传，让后端用当前时间；这里示例传前端时间
+          cancelledAt: new Date().toISOString().slice(0, 19), // 截断为 "YYYY-MM-DDTHH:mm:ss"，更贴近 LocalDateTime
+          cancellationReason: reason || null,
         }
-        await appointmentStore.updateAppointment(updated)
+
+        try {
+          console.log('Calling PATCH /api/appointments/{id}/cancel with body:', body)
+          await appointmentApi.cancelAppointment(row.appointmentId, body)
+        } catch (err) {
+          console.error('取消预约失败 body / error:', body, err?.response || err)
+          ns.push('error', err?.response?.data?.message || err.message || '取消预约失败')
+          return
+        }
+
         ns.push('warning', '预约已取消')
-        cancelDialogVisible.value = false
-        refresh()
-      } catch (e) {
-        ns.push('error', e?.response?.data?.message || e.message || '取消预约失败')
+        await refresh()
       } finally {
         cancelling.value = false
       }
     }
 
+    // confirmCancel 已不再使用，可以保持空实现或后续删除
+    const confirmCancel = async () => {}
+
+    const fetchProviderIfNeeded = async providerId => {
+      const pid = Number(providerId)
+      if (!pid) return null
+      if (providerCache.value[pid]) return providerCache.value[pid]
+      try {
+        const p = await providerApi.getProviderById(pid)
+        providerCache.value[pid] = p
+        return p
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || `加载医生信息失败 (ID=${pid})`)
+        return null
+      }
+    }
+
+    const preloadProviderNames = async () => {
+      const appointments = appointmentStore.appointments || []
+      for (const a of appointments) {
+        const providerId = a.providerId || a.provider?.providerId
+        if (!providerId || !a.appointmentId) continue
+        const p = await fetchProviderIfNeeded(providerId)
+        if (p) {
+          providerNames.value[a.appointmentId] = p.name || p.providerName || ''
+        }
+      }
+    }
+
+    const normalizeStatusType = s => {
+      if (s == null) return undefined
+      const key = String(s).toUpperCase()
+      switch (key) {
+        case 'SCHEDULED': return 'info'
+        case 'CANCELLED': return 'warning'
+        case 'COMPLETED': return 'success'
+        case 'NO_SHOW': return 'danger'
+        default: return undefined
+      }
+    }
+
     const formattedAppointments = computed(() =>
-      appointmentStore.appointments.map(a => ({
+      (appointmentStore.appointments || []).map(a => ({
         ...a,
-        date: formatDateTime(a.scheduledAt || a.date),
-      }))
+        providerName: a.providerName || providerNames.value[a.appointmentId] || '',
+        // 直接用后端返回的时间字符串，通过 formatLocalDateTime 仅替换 T
+        date: formatLocalDateTime(a.scheduledAt || a.date),
+        createdAtFormatted: formatLocalDateTime(a.createdAt),
+        statusType: normalizeStatusType(a.status),
+      })),
     )
 
-    const mapStatusType = s => ({
-      SCHEDULED: '',
-      CANCELLED: 'warning',
-      COMPLETED: 'success',
-      NO_SHOW: 'danger',
-    }[s] || '')
+    onMounted(async () => {
+      await Promise.all([
+        refresh(),
+        loadProviders(),
+      ])
+    })
 
-    onMounted(refresh)
     return {
-      appointmentStore,
-      loading,
-      creating,
+      handleBack,
       form,
       rules,
-      formRef,
-      create,
-      reset,
+      loading,
+      creating,
+      cancelling,
       refresh,
+      reset,
+      create,
       deleteAppointment,
-      cancelDialogVisible,
-      cancelForm,
       openCancel,
       confirmCancel,
-      cancelling,
       formattedAppointments,
-      mapStatusType,
+      providers,
+      providersLoading,
+      formRef,
     }
   },
 }
 </script>
+
 <style scoped>
-.create-form { max-width:600px; }
-.toolbar { margin-bottom:10px; display:flex; gap:10px; }
+/* 保持原有样式不变 */
 </style>

@@ -27,8 +27,22 @@ export const useFamilyStore = defineStore('familyStore', {
 
         async fetchGroupDetail(groupId) {
             const detail = await familyApi.getFamilyGroup(groupId)
-            this.members = detail.members || []
             return detail
+        },
+
+        async fetchMembers(groupId) {
+            this.loading = true
+            this.error = null
+            try {
+                const data = await familyApi.getMembers(groupId)
+                this.members = data
+                return data
+            } catch (e) {
+                this.error = e.message
+                throw e
+            } finally {
+                this.loading = false
+            }
         },
 
         async createGroup(payload) {

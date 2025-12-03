@@ -68,25 +68,84 @@
 <script>
 import { ref, reactive } from 'vue'
 import { useHealthStore } from '../stores/healthStore'
+import { useAppointmentStore } from '../stores/appointmentStore'
 import SectionCard from '../components/SectionCard.vue'
-import appointmentApi from '../api/appointmentApi'
+import { useNotificationStore } from '../stores/notificationStore'
+
 export default {
-  components:{ SectionCard },
+  components: { SectionCard },
   setup() {
     const healthStore = useHealthStore()
+    const appointmentStore = useAppointmentStore()
+    const ns = useNotificationStore()
     const active = ref('appointments')
-    const appointmentQuery = reactive({ userId:'', providerId:'', startDate:'', endDate:'' })
-    const recordQuery = reactive({ userId:'', startDate:'', endDate:'' })
+    const appointmentQuery = reactive({ userId: '', providerId: '', startDate: '', endDate: '' })
+    const recordQuery = reactive({ userId: '', startDate: '', endDate: '' })
     const appointmentResults = ref([])
     const recordResults = ref([])
     const searchingAppointments = ref(false)
     const searchingRecords = ref(false)
-    const searchAppointments = async () => { searchingAppointments.value=true; try { appointmentResults.value = await appointmentApi.searchAppointments({ ...appointmentQuery }) } finally { searchingAppointments.value=false } }
-    const searchRecords = async () => { searchingRecords.value=true; try { recordResults.value = await healthStore.searchRecords({ ...recordQuery }) } finally { searchingRecords.value=false } }
-    const resetAppointments = () => { appointmentQuery.userId=''; appointmentQuery.providerId=''; appointmentQuery.startDate=''; appointmentQuery.endDate=''; appointmentResults.value=[] }
-    const resetRecords = () => { recordQuery.userId=''; recordQuery.startDate=''; recordQuery.endDate=''; recordResults.value=[] }
-    return { active, appointmentQuery, recordQuery, appointmentResults, recordResults, searchingAppointments, searchingRecords, searchAppointments, searchRecords, resetAppointments, resetRecords }
-  }
+
+    // 简单示例：当前端已经加载了全部数据后，在前端做过滤。
+    const searchAppointments = async () => {
+      searchingAppointments.value = true
+      try {
+        // 确保有基础数据
+        if (!appointmentStore.appointments.length) {
+          await appointmentStore.fetchAppointments()
+        }
+        const list = appointmentStore.appointments
+        appointmentResults.value = list // TODO: 根据 appointmentQuery 做过滤
+        ns.push('info', '当前仅做简单演示过滤，可按需求扩展')
+      } finally {
+        searchingAppointments.value = false
+      }
+    }
+
+    const searchRecords = async () => {
+      searchingRecords.value = true
+      try {
+        // 确保有基础数据
+        if (!healthStore.healthRecords.length && recordQuery.userId) {
+          await healthStore.fetchHealthRecords(recordQuery.userId)
+        }
+        const list = healthStore.healthRecords
+        recordResults.value = list // TODO: 根据 recordQuery 做过滤
+        ns.push('info', '当前仅做简单演示过滤，可按需求扩展')
+      } finally {
+        searchingRecords.value = false
+      }
+    }
+
+    const resetAppointments = () => {
+      appointmentQuery.userId = ''
+      appointmentQuery.providerId = ''
+      appointmentQuery.startDate = ''
+      appointmentQuery.endDate = ''
+      appointmentResults.value = []
+    }
+
+    const resetRecords = () => {
+      recordQuery.userId = ''
+      recordQuery.startDate = ''
+      recordQuery.endDate = ''
+      recordResults.value = []
+    }
+
+    return {
+      active,
+      appointmentQuery,
+      recordQuery,
+      appointmentResults,
+      recordResults,
+      searchingAppointments,
+      searchingRecords,
+      searchAppointments,
+      searchRecords,
+      resetAppointments,
+      resetRecords,
+    }
+  },
 }
 </script>
 

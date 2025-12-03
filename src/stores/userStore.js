@@ -32,25 +32,36 @@ export const useUserStore = defineStore('userStore', {
                 payload.password = password
 
                 const data = await authApi.login(payload)
-                // 后端文档：{ accessToken, refreshToken, tokenType, userId }
                 this.accessToken = data.accessToken || null
                 this.refreshToken = data.refreshToken || null
                 this.userId = data.userId || null
 
-                if (this.accessToken) {
-                    localStorage.setItem('token', this.accessToken)
-                }
-                if (this.refreshToken) {
-                    localStorage.setItem('refreshToken', this.refreshToken)
-                }
+                if (this.accessToken) localStorage.setItem('token', this.accessToken)
+                if (this.refreshToken) localStorage.setItem('refreshToken', this.refreshToken)
                 if (this.userId) {
                     localStorage.setItem('userId', this.userId)
-                    // 登录后拉一次用户详情
                     const userDetail = await userApi.getUserById(this.userId)
                     this.user = userDetail
-                    this.emails = userDetail.emails || []
-                    this.phones = userDetail.phones || []
-                    this.providers = userDetail.providers || []
+                    // 通过 userId 查询该用户已有的邮箱记录
+                    try {
+                        const emailList = await userApi.getEmailsByUser(this.userId)
+                        this.emails = emailList || []
+                    } catch {
+                        this.emails = []
+                    }
+                    // 用 user.phone / phoneVerified 映射一条 phones 记录，方便 UI 展示
+                    this.phones = userDetail.phone ? [{
+                        phoneId: userDetail.userId,
+                        phoneNumber: userDetail.phone,
+                        verified: !!userDetail.phoneVerified,
+                    }] : []
+                    // 通过 provider-links API 加载当前用户的关联医生/机构
+                    try {
+                        const links = await userApi.getProviderLinks(this.userId)
+                        this.providers = links || []
+                    } catch {
+                        this.providers = []
+                    }
                 }
 
                 return data
@@ -64,9 +75,23 @@ export const useUserStore = defineStore('userStore', {
             if (this.userId && !this.user) {
                 const userDetail = await userApi.getUserById(this.userId)
                 this.user = userDetail
-                this.emails = userDetail.emails || []
-                this.phones = userDetail.phones || []
-                this.providers = userDetail.providers || []
+                try {
+                    const emailList = await userApi.getEmailsByUser(this.userId)
+                    this.emails = emailList || []
+                } catch {
+                    this.emails = []
+                }
+                this.phones = userDetail.phone ? [{
+                    phoneId: userDetail.userId,
+                    phoneNumber: userDetail.phone,
+                    verified: !!userDetail.phoneVerified,
+                }] : []
+                try {
+                    const links = await userApi.getProviderLinks(this.userId)
+                    this.providers = links || []
+                } catch {
+                    this.providers = []
+                }
             }
         },
 
@@ -116,14 +141,16 @@ export const useUserStore = defineStore('userStore', {
         // 邮箱相关
         async addEmail(emailAddress) {
             if (!this.user?.userId) throw new Error('No user loaded')
-            const email = await userApi.addEmail(this.user.userId, { emailAddress })
+            // 使用 /api/emails/create 在 emails 表中创建记录
+            const email = await userApi.createEmailForUser(this.user.userId, emailAddress)
             this.emails.push(email)
             return email
         },
 
         async removeEmail(emailId) {
-            await userApi.removeEmail(emailId)
-            this.emails = this.emails.filter(e => e.emailId !== emailId)
+            // 当前后端只提供 /api/emails/verify /unverify 和 /create，没有删除接口，
+            // 这里先仅从前端列表移除以避免 404；如果后端增加 DELETE /api/emails/{id} 可在此调用
+            this.emails = this.emails.filter(e => e.emailId !== emailId && e.id !== emailId)
         },
 
         // 手机号相关
@@ -136,7 +163,7 @@ export const useUserStore = defineStore('userStore', {
 
         async removePhone(phoneId) {
             await userApi.removePhone(phoneId)
-            this.phones = this.phones.filter(p => p.phoneId !== phoneId)
+            this.phones = this.phones.filter(p => p.phoneId !== phoneId && p.id !== phoneId)
         },
 
         // Provider 关联（使用 /users/{userId}/provider-links）
@@ -149,7 +176,7 @@ export const useUserStore = defineStore('userStore', {
 
         async unlinkProvider(linkId) {
             await userApi.deleteProviderLink(linkId)
-            this.providers = this.providers.filter(p => p.id !== linkId)
+            this.providers = this.providers.filter(p => p.id !== linkId && p.linkId !== linkId)
         },
     },
 })

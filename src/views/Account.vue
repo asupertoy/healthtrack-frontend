@@ -28,7 +28,8 @@
             <el-button type="primary" @click="addEmail" :disabled="!newEmail">添加</el-button>
           </div>
           <el-table :data="emails" size="small" style="margin-top:10px">
-            <el-table-column prop="email" label="邮箱" />
+            <!-- 显示后端返回的 emailAddress 字段 -->
+            <el-table-column prop="emailAddress" label="邮箱" />
             <el-table-column prop="verified" label="已验证" width="90">
               <template #default="{ row }">
                 <el-tag :type="row.verified ? 'success':'warning'">{{ row.verified ? '是':'否' }}</el-tag>
@@ -36,7 +37,7 @@
             </el-table-column>
             <el-table-column label="操作" width="100">
               <template #default="{ row }">
-                <el-button type="danger" size="small" @click="removeEmail(row.emailId)">删除</el-button>
+                <el-button type="danger" size="small" @click="removeEmail(row.emailId || row.id)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -49,15 +50,20 @@
             <el-button type="primary" @click="addPhone" :disabled="!newPhone">添加</el-button>
           </div>
           <el-table :data="phones" size="small" style="margin-top:10px">
-            <el-table-column prop="phone" label="手机号" />
+            <!-- 显示 phoneNumber 或 phone 字段 -->
+            <el-table-column prop="phoneNumber" label="手机号">
+              <template #default="{ row }">{{ row.phoneNumber || row.phone }}</template>
+            </el-table-column>
             <el-table-column prop="verified" label="已验证" width="90">
               <template #default="{ row }">
-                <el-tag :type="row.verified ? 'success':'warning'">{{ row.verified ? '是':'否' }}</el-tag>
+                <el-tag :type="row.verified ? 'success' : 'warning'">
+                  {{ row.verified ? '是' : '否' }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="100">
               <template #default="{ row }">
-                <el-button type="danger" size="small" @click="removePhone(row.phoneId)">删除</el-button>
+                <el-button type="danger" size="small" @click="removePhone(row.phoneId || row.id)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -66,12 +72,17 @@
       <el-tab-pane label="医生/机构" name="providers">
         <SectionCard title="关联的医疗提供者">
           <div class="flex-row">
-            <el-input v-model="newProviderId" placeholder="医疗执照号" style="max-width:240px" />
+            <el-input v-model="newProviderId" placeholder="医生ID（providerId）" style="max-width:240px" />
             <el-button type="primary" @click="linkProvider" :disabled="!newProviderId">关联</el-button>
           </div>
           <el-table :data="providers" size="small" style="margin-top:10px">
-            <el-table-column prop="providerName" label="名称" />
-            <el-table-column prop="licenseNumber" label="执照号" />
+            <!-- 如果是 provider-link DTO，可能包含 provider.name / provider.licenseNumber -->
+            <el-table-column label="名称">
+              <template #default="{ row }">{{ row.providerName || row.provider?.name || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="执照号">
+              <template #default="{ row }">{{ row.licenseNumber || row.provider?.licenseNumber || '-' }}</template>
+            </el-table-column>
             <el-table-column prop="verified" label="已验证" width="90">
               <template #default="{ row }">
                 <el-tag :type="row.verified ? 'success':'danger'">{{ row.verified ? '是':'否' }}</el-tag>
@@ -79,7 +90,7 @@
             </el-table-column>
             <el-table-column label="操作" width="100">
               <template #default="{ row }">
-                <el-button type="danger" size="small" @click="unlinkProvider(row.linkId)">解除</el-button>
+                <el-button type="danger" size="small" @click="unlinkProvider(row.linkId || row.id)">解除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -93,6 +104,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useUserStore } from '../stores/userStore'
 import SectionCard from '../components/SectionCard.vue'
 import { useNotificationStore } from '../stores/notificationStore'
+import providerApi from '../api/providerApi'
 
 export default {
   components: { SectionCard },
@@ -109,7 +121,31 @@ export default {
     const emails = ref([])
     const phones = ref([])
     const providers = ref([])
+    const providerDetailsCache = ref({})
     const profileRules = { name: [{ required: true, message: '必填', trigger: 'blur' }] }
+
+    const enrichProviderLinks = async rawLinks => {
+      const result = []
+      for (const link of rawLinks || []) {
+        const providerId = link.providerId || link.provider?.providerId
+        let providerDetail = providerDetailsCache.value[providerId]
+        if (providerId && !providerDetail) {
+          try {
+            providerDetail = await providerApi.getProviderById(providerId)
+            providerDetailsCache.value[providerId] = providerDetail
+          } catch (e) {
+            ns.push('error', e?.response?.data?.message || e.message || `加载医生信息失败(ID=${providerId})`)
+          }
+        }
+        result.push({
+          ...link,
+          providerName: providerDetail?.name || link.providerName,
+          licenseNumber: providerDetail?.licenseNumber || link.licenseNumber,
+          verified: providerDetail?.verified ?? link.verified,
+        })
+      }
+      return result
+    }
 
     const reloadProfile = async () => {
       try {
@@ -123,9 +159,10 @@ export default {
           primaryEmail: userStore.user.primaryEmail || userStore.user.email || '',
           phone: userStore.user.phone || '',
         })
-        emails.value = userStore.emails
-        phones.value = userStore.phones
-        providers.value = userStore.providers
+        // 使用 store 中的列表作为单一数据源，确保已有数据展示出来
+        emails.value = [...(userStore.emails || [])]
+        phones.value = [...(userStore.phones || [])]
+        providers.value = await enrichProviderLinks(userStore.providers || [])
       } catch (e) {
         ns.push('error', e?.response?.data?.message || e.message || '加载账户信息失败')
       }
@@ -158,7 +195,7 @@ export default {
 
     const removeEmail = async id => {
       await userStore.removeEmail(id)
-      emails.value = emails.value.filter(e => e.emailId !== id)
+      emails.value = emails.value.filter(e => (e.emailId || e.id) !== id)
       ns.push('info', '邮箱已删除')
     }
 
@@ -171,20 +208,21 @@ export default {
 
     const removePhone = async id => {
       await userStore.removePhone(id)
-      phones.value = phones.value.filter(p => p.phoneId !== id)
+      phones.value = phones.value.filter(p => (p.phoneId || p.id) !== id)
       ns.push('info', '手机号已删除')
     }
 
     const linkProvider = async () => {
       const linked = await userStore.linkProvider(newProviderId.value)
-      providers.value.push(linked)
+      const enriched = await enrichProviderLinks([linked])
+      providers.value.push(enriched[0])
       ns.push('success', '已关联提供者')
       newProviderId.value = ''
     }
 
     const unlinkProvider = async linkId => {
       await userStore.unlinkProvider(linkId)
-      providers.value = providers.value.filter(p => p.linkId !== linkId)
+      providers.value = providers.value.filter(p => (p.linkId || p.id) !== linkId)
       ns.push('warning', '已解除关联')
     }
 

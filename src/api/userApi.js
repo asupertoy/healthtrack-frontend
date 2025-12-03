@@ -19,18 +19,15 @@ export default {
     },
 
     updateUser(userId, payload) {
-        // 后端规范没有单独写更新，可按实际接口调整；这里假设 PUT /api/users/{id}
         return http.put(`/users/${userId}`, payload).then(res => res.data)
     },
 
-    // 邮箱相关（按你的邮箱模块 API 可能单独有 /api/emails，这里保留用户下挂方式，具体按后端实现调整）
+    // 邮箱相关（如果未来在 /users/{id}/emails 下挂，可使用此方法；当前实际使用 EmailController 的接口）
     addEmail(userId, { emailAddress }) {
-        // 如果实际后端是 /api/emails/create，可以改为 http.post('/emails/create', { userId, emailAddress })
         return http.post(`/users/${userId}/emails`, { emailAddress }).then(res => res.data)
     },
 
     removeEmail(emailId) {
-        // 若后端为 DELETE /api/emails/{id}
         return http.delete(`/emails/${emailId}`).then(res => res.data)
     },
 
@@ -41,6 +38,21 @@ export default {
 
     removePhone(phoneId) {
         return http.delete(`/users/phones/${phoneId}`).then(res => res.data)
+    },
+
+    // 通过 EmailController 创建邮箱记录（/api/emails/create）
+    createEmailForUser(userId, emailAddress) {
+        // 对应后端 POST /api/emails/create
+        return http.post('/emails/create', { emailAddress, userId }).then(res => res.data)
+    },
+
+    // 标记邮箱验证/取消验证（/api/emails/verify /api/emails/unverify）
+    verifyEmail(emailAddress) {
+        return http.post('/emails/verify', null, { params: { emailAddress } }).then(res => res.data)
+    },
+
+    unverifyEmail(emailAddress) {
+        return http.post('/emails/unverify', null, { params: { emailAddress } }).then(res => res.data)
     },
 
     // User-Provider 关联：使用后端的 provider-links 子模块
@@ -56,5 +68,10 @@ export default {
 
     deleteProviderLink(linkId) {
         return http.delete(`/users/provider-links/${linkId}`).then(res => res.data)
+    },
+
+    // 通过 userId 查询该用户的所有邮箱记录：GET /api/emails/by-user?userId=...
+    getEmailsByUser(userId) {
+        return http.get('/emails/by-user', { params: { userId } }).then(res => res.data)
     },
 }

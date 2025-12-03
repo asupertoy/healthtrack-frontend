@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import appointmentApi from '../api/appointmentApi'
+import { useUserStore } from './userStore'
 
 export const useAppointmentStore = defineStore('appointmentStore', {
     state: () => ({
@@ -9,11 +10,18 @@ export const useAppointmentStore = defineStore('appointmentStore', {
     }),
 
     actions: {
-        async fetchAppointments(params) {
+        async fetchAppointments() {
             this.loading = true
             this.error = null
             try {
-                const data = await appointmentApi.getAppointments(params)
+                const userStore = useUserStore()
+                const bookingUserId = userStore.user?.userId || userStore.userId || localStorage.getItem('userId')
+                // 如果没有用户ID，就不请求，返回空列表
+                if (!bookingUserId) {
+                    this.appointments = []
+                    return []
+                }
+                const data = await appointmentApi.getAppointmentsByBookingUser(bookingUserId)
                 this.appointments = data
                 return data
             } catch (e) {
@@ -25,17 +33,16 @@ export const useAppointmentStore = defineStore('appointmentStore', {
         },
 
         async createAppointment(payload) {
-            const data = await appointmentApi.createAppointment(payload)
-            this.appointments.push(data)
-            return data
+            const created = await appointmentApi.createAppointment(payload)
+            this.appointments.push(created)
+            return created
         },
 
         async updateAppointment(payload) {
-            const data = await appointmentApi.updateAppointment(payload)
-            const id = data.appointmentId
-            const index = this.appointments.findIndex(a => a.appointmentId === id)
-            if (index !== -1) this.appointments[index] = data
-            return data
+            const updated = await appointmentApi.updateAppointment(payload)
+            const idx = this.appointments.findIndex(a => a.appointmentId === updated.appointmentId)
+            if (idx !== -1) this.appointments[idx] = updated
+            return updated
         },
 
         async deleteAppointment(id) {
