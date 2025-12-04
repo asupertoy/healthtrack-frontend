@@ -38,4 +38,21 @@ export default {
     getMonthlySummaries(userId) {
         return http.get(`/health-records/summary/${userId}`).then(res => res.data)
     },
+
+    // 健康记录排行榜：按健康记录数统计最活跃用户
+    // 对应后端 GET /api/health-records/leaderboard?top=1
+    getHealthRecordLeaderboard(top = 1) {
+        return http.get('/health-records/leaderboard', { params: { top } }).then(res => res.data)
+    },
+
+    // 健康记录搜索：按 userId + 可选开始/结束日期过滤
+    // 对应后端 GET /api/health-records/search?userId=1&startDate=2025-11-01&endDate=2025-11-30
+    searchHealthRecords(query) {
+        const params = {
+            userId: query.userId || undefined,
+            startDate: query.startDate || undefined,
+            endDate: query.endDate || undefined,
+        }
+        return http.get('/health-records/search', { params }).then(res => res.data)
+    },
 }

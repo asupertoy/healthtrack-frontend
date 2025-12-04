@@ -68,8 +68,20 @@ export default {
         return http.post('/emails/create', payload).then(res => res.data);
     },
 
-    unverifyEmail(emailAddress) {
-        return http.post('/emails/unverify', null, { params: { emailAddress } }).then(res => res.data)
+    // 标记邮箱为已验证：POST /api/emails/verify?emailAddress=...
+    verifyEmail(emailAddress) {
+        return http.post('/emails/verify', null, { params: { emailAddress } }).then(res => res.data)
+    },
+
+    // 标记用户手机号为已验证：PATCH /api/users/{id}
+    verifyPhone(userId, payload) {
+        // payload 至少包含 phoneVerified / phoneVerifiedAt
+        return http.patch(`/users/${userId}`, payload).then(res => res.data)
+    },
+
+    // Provider-link 验证：PATCH /api/users/provider-links/{linkId}
+    verifyProviderLink(linkId, payload = { verificationStatus: 'verified' }) {
+        return http.patch(`/users/provider-links/${linkId}`, payload).then(res => res.data)
     },
 
     // User-Provider 关联：使用后端的 provider-links 子模块
@@ -90,5 +102,20 @@ export default {
     // 通过 userId 查询该用户的所有邮箱记录：GET /api/emails/by-user?userId=...
     getEmailsByUser(userId) {
         return http.get('/emails/by-user', { params: { userId } }).then(res => res.data)
+    },
+
+    // 标记邮箱为未验证：POST /api/emails/unverify?emailAddress=...
+    unverifyEmail(emailAddress) {
+        return http.post('/emails/unverify', null, { params: { emailAddress } }).then(res => res.data)
+    },
+
+    // 标记用户手机号为未验证：PATCH /api/users/{id}
+    unverifyPhone(userId, payload) {
+        return http.patch(`/users/${userId}`, payload).then(res => res.data)
+    },
+
+    // Provider-link 取消验证：PATCH /api/users/provider-links/{linkId}
+    unverifyProviderLink(linkId, payload = { verificationStatus: 'unverified' }) {
+        return http.patch(`/users/provider-links/${linkId}`, payload).then(res => res.data)
     },
 }

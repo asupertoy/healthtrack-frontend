@@ -37,4 +37,16 @@ export default {
         // 调用后端 PATCH /api/appointments/{id}/cancel 取消预约
         return http.patch(`/appointments/${id}/cancel`, data).then(res => res.data)
     },
+
+    // 按条件搜索预约：bookingUserId, providerId, startDate, endDate
+    // 对应后端 GET /api/appointments/search
+    searchAppointments(query) {
+        const params = {
+            bookingUserId: query.userId || undefined,
+            providerId: query.providerId || undefined,
+            startDate: query.startDate || undefined,
+            endDate: query.endDate || undefined,
+        }
+        return http.get('/appointments/search', { params }).then(res => res.data)
+    },
 }

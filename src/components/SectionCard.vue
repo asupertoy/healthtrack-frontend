@@ -13,7 +13,20 @@
 defineProps({ title: { type:String, default:'' } })
 </script>
 <style scoped>
-.section-card { margin-bottom:20px; }
-.card-header { display:flex; justify-content:space-between; align-items:center; font-weight:600; }
+.section-card {
+  margin-bottom: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+:deep(.el-card__body) {
+  padding: 16px 20px 18px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: #303133;
+}
 </style>
-

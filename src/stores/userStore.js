@@ -173,6 +173,25 @@ export const useUserStore = defineStore('userStore', {
             this.emails = this.emails.filter(e => e.emailId !== emailId && e.id !== emailId)
         },
 
+        // 标记邮箱为已验证：调用后端 /api/emails/verify，并刷新本地 emails
+        async verifyEmail(emailAddress) {
+            if (!this.user?.userId) throw new Error('No user loaded')
+            await userApi.verifyEmail(emailAddress)
+            // 重新拉取该用户的邮箱列表，确保与 DB 一致
+            const list = await userApi.getEmailsByUser(this.user.userId)
+            this.emails = list || []
+            return this.emails
+        },
+
+        // 取消邮箱验证：调用 /api/emails/unverify 并刷新本地 emails
+        async unverifyEmail(emailAddress) {
+            if (!this.user?.userId) throw new Error('No user loaded')
+            await userApi.unverifyEmail(emailAddress)
+            const list = await userApi.getEmailsByUser(this.user.userId)
+            this.emails = list || []
+            return this.emails
+        },
+
         // 手机号相关
         async addPhone(phoneNumber) {
             if (!this.user?.userId) throw new Error('No user loaded')
@@ -191,34 +210,26 @@ export const useUserStore = defineStore('userStore', {
             this.phones = this.phones.filter(p => p.phoneId !== phoneId && p.id !== phoneId)
         },
 
-        // 更新手机号（部分更新 user）；将 user.phone 更新为新值，并同步本地 phones 数组
-        async updatePhone(input) {
-            // input can be a string (phone number) or an object { id, phoneNumber }
+        // 标记手机号为已验证：PATCH /api/users/{id} 更新 phoneVerified/phoneVerifiedAt
+        async verifyPhone() {
             if (!this.user?.userId) throw new Error('No user loaded')
-            const phoneNumber = typeof input === 'string' ? input : (input?.phoneNumber || input?.number || null)
-            if (!phoneNumber) throw new Error('No phone number provided')
-            // Build payload: clear verification; backend will set updatedAt automatically
-            const payload = {
-                phone: phoneNumber,
-                phoneVerified: false,
-                phoneVerifiedAt: null,
-            }
+            const now = new Date().toISOString().slice(0, 19)
+            const payload = { phoneVerified: true, phoneVerifiedAt: now }
+            const updated = await userApi.verifyPhone(this.user.userId, payload)
+            // 如果后端返回完整 user，用它；否则保守更新本地 user
+            this.user = Object.assign({}, this.user, updated || {}, payload)
+            this.phones = [{ phoneId: this.user.userId, phoneNumber: this.user.phone, verified: true }]
+            return this.phones
+        },
 
-            try {
-                const updatedUser = await this.updateUser(payload)
-                // Ensure local user reflects changes (don't set updatedAt here; backend manages it)
-                this.user = Object.assign({}, this.user, updatedUser || {}, {
-                    phone: phoneNumber,
-                    phoneVerified: false,
-                    phoneVerifiedAt: null,
-                })
-            } catch (e) {
-                throw e
-            }
-
-            // reflect in local phones array
-            this.phones = [{ phoneId: this.user.userId, phoneNumber, verified: false }]
-            return this.phones[0]
+        // 取消手机号验证：设置 phoneVerified=false, phoneVerifiedAt=null
+        async unverifyPhone() {
+            if (!this.user?.userId) throw new Error('No user loaded')
+            const payload = { phoneVerified: false, phoneVerifiedAt: null }
+            const updated = await userApi.unverifyPhone(this.user.userId, payload)
+            this.user = Object.assign({}, this.user, updated || {}, payload)
+            this.phones = [{ phoneId: this.user.userId, phoneNumber: this.user.phone, verified: false }]
+            return this.phones
         },
 
         // Provider 关联（使用 /users/{userId}/provider-links）
@@ -232,6 +243,24 @@ export const useUserStore = defineStore('userStore', {
         async unlinkProvider(linkId) {
             await userApi.deleteProviderLink(linkId)
             this.providers = this.providers.filter(p => p.id !== linkId && p.linkId !== linkId)
+        },
+
+        // 标记 provider-link 为已验证：PATCH /api/users/provider-links/{linkId} 并刷新列表
+        async verifyProviderLink(linkId) {
+            if (!this.user?.userId) throw new Error('No user loaded')
+            await userApi.verifyProviderLink(linkId, { verificationStatus: 'verified' })
+            const links = await userApi.getProviderLinks(this.user.userId)
+            this.providers = links || []
+            return this.providers
+        },
+
+        // 取消 provider-link 验证：标记为未验证并刷新列表
+        async unverifyProviderLink(linkId) {
+            if (!this.user?.userId) throw new Error('No user loaded')
+            await userApi.unverifyProviderLink(linkId, { verificationStatus: 'unverified' })
+            const links = await userApi.getProviderLinks(this.user.userId)
+            this.providers = links || []
+            return this.providers
         },
 
         // 明确暴露一个按 userId 拉取 provider-links 的方法，供 UI 手动刷新使用

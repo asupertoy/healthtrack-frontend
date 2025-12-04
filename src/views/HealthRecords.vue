@@ -28,12 +28,24 @@
           <el-select v-model="form.metricType" placeholder="指标类型" filterable>
             <el-option label="步数" value="steps" />
             <el-option label="体重" value="weight" />
+            <el-option label="身高" value="height" />
+            <el-option label="摄入卡路里" value="calories" />
             <el-option label="血压" value="blood_pressure" />
             <el-option label="心率" value="heart_rate" />
+            <el-option label="睡眠时长" value="sleep_duration" />
           </el-select>
         </el-form-item>
         <el-form-item label="数值" prop="metricValue">
-          <el-input-number v-model="form.metricValue" :min="0" :step="1" />
+          <!-- 血压使用 systolic/diastolic 组合输入，例如 120/80 -->
+          <template v-if="form.metricType === 'blood_pressure'">
+            <el-input
+              v-model="form.metricValue"
+              placeholder="请输入血压，例如 120/80"
+            />
+          </template>
+          <template v-else>
+            <el-input-number v-model="form.metricValue" :min="0" :step="1" />
+          </template>
         </el-form-item>
         <el-form-item label="单位">
           <el-input v-model="form.metricUnit" placeholder="例如 kg / bpm" />
@@ -46,7 +58,7 @@
     </SectionCard>
     <!-- 记录列表和编辑对话框 -->
     <SectionCard title="记录列表">
-      <el-table :data="records" v-loading="loading" size="small" empty-text="暂无记录" @row-dblclick="startEdit">
+      <el-table :data="sortedRecords" v-loading="loading" size="small" empty-text="暂无记录" @row-dblclick="startEdit">
         <el-table-column type="index" width="50" />
         <el-table-column prop="recordDate" label="日期" />
         <el-table-column prop="metricType" label="类型" />
@@ -132,12 +144,21 @@ export default {
      switch (type) {
        case 'weight':
          return 'kg'
+      case 'height':
+        return 'cm'
+      case 'calories':
+        return 'kcal'
        case 'blood_pressure':
          return 'mmHg'
+      case 'blood_pressure_systolic':
+      case 'blood_pressure_diastolic':
+        return 'mmHg'
        case 'heart_rate':
          return 'bpm'
+      case 'sleep_duration':
+        return 'hours'
        case 'steps':
-         return '步'
+         return 'count'
        default:
          return ''
      }
@@ -174,21 +195,26 @@ export default {
       if (!row) return ''
       const type = row.metricType
       const val = row.metricValue
-      // support snake_case or camelCase metricJson
       const mjson = row.metricJson || row.metric_json || row.metricJSON || null
-      if (type === 'blood_pressure' && (val === null || val === undefined || val === '')) {
-        if (!mjson) return ''
-        // mjson might be a stringified JSON or an object
-        let obj = mjson
-        if (typeof mjson === 'string') {
-          try { obj = JSON.parse(mjson) } catch (e) { /* fall back to raw string */ return mjson }
+      if (type === 'blood_pressure') {
+        // 优先解析 metricValue 中的 "systolic/diastolic" 形式
+        if (typeof val === 'string' && val.includes('/')) {
+          const parts = val.split('/').map(p => p.trim()).filter(Boolean)
+          if (parts.length === 2) return `${parts[0]}/${parts[1]}`
         }
-        // common keys: systolic/diastolic or systolicPressure/diastolicPressure
-        const s = obj.systolic ?? obj.systolicPressure ?? obj.s ?? obj.sys ?? null
-        const d = obj.diastolic ?? obj.diastolicPressure ?? obj.d ?? obj.dia ?? null
-        if (s != null && d != null) return `${s}/${d}`
-        // otherwise pretty-print whole object
-        try { return JSON.stringify(obj) } catch (e) { return String(obj) }
+        if (val === null || val === undefined || val === '') {
+          if (!mjson) return ''
+          let obj = mjson
+          if (typeof mjson === 'string') {
+            try { obj = JSON.parse(mjson) } catch (e) { return mjson }
+          }
+          const s = obj.systolic ?? obj.systolicPressure ?? obj.s ?? obj.sys ?? null
+          const d = obj.diastolic ?? obj.diastolicPressure ?? obj.d ?? obj.dia ?? null
+          if (s != null && d != null) return `${s}/${d}`
+          try { return JSON.stringify(obj) } catch (e) { return String(obj) }
+        }
+        // 其他情况下直接展示数值
+        return val == null ? '' : String(val)
       }
       // default display
       return val == null ? '' : String(val)
@@ -218,9 +244,19 @@ export default {
 
      monthRecords.forEach(r => {
        const type = r.metricType
+      // 新增类型：身高、卡路里，直接按类型聚合
+      if (type === 'height' || type === 'calories') {
+        const unit = r.metricUnit || typeToUnit(type)
+        pushValue(type, r.metricValue, unit)
+        return
+      }
+      if (type === 'sleep_duration') {
+        const unit = r.metricUnit || typeToUnit(type)
+        pushValue(type, r.metricValue, unit)
+        return
+      }
        // handle blood_pressure specially
        if (type === 'blood_pressure') {
-         // metricValue may be null; try metricJson for systolic/diastolic
          const mjson = r.metricJson || r.metric_json || r.metricJSON || null
          let obj = null
          if (mjson) {
@@ -228,20 +264,27 @@ export default {
          }
          const s = obj?.systolic ?? obj?.systolicPressure ?? obj?.s ?? obj?.sys ?? null
          const d = obj?.diastolic ?? obj?.diastolicPressure ?? obj?.d ?? obj?.dia ?? null
-         // also if metricValue itself encodes combined value like '120/80', try parse
-         if ((r.metricValue === null || r.metricValue === undefined || r.metricValue === '') && typeof r.metricValue === 'string') {
+        // also if metricValue encodes combined value like '120/80', try parse
+         if (typeof r.metricValue === 'string' && r.metricValue.includes('/')) {
            const parts = (r.metricValue || '').split('/').map(p => p.trim())
-           if (parts.length === 2) { pushValue('blood_pressure_systolic', parts[0], 'mmHg'); pushValue('blood_pressure_diastolic', parts[1], 'mmHg'); return }
+           if (parts.length === 2) {
+             pushValue('blood_pressure_systolic', parts[0], 'mmHg')
+             pushValue('blood_pressure_diastolic', parts[1], 'mmHg')
+             return
+           }
          }
          // push numeric metricValue if present (unlikely for BP)
          if (r.metricValue !== null && r.metricValue !== undefined && r.metricValue !== '') {
-           // if it's a number, assume it's systolic? but better skip; try to parse as number and push to systolic
            const num = Number(r.metricValue)
            if (!Number.isNaN(num)) pushValue('blood_pressure_systolic', num, 'mmHg')
          }
          // push parsed s/d
          if (s != null) pushValue('blood_pressure_systolic', s, 'mmHg')
          if (d != null) pushValue('blood_pressure_diastolic', d, 'mmHg')
+      } else if (type === 'blood_pressure_systolic' || type === 'blood_pressure_diastolic') {
+        // 新的拆分类型：直接按各自类型聚合
+        const unit = r.metricUnit || typeToUnit(type)
+        pushValue(type, r.metricValue, unit)
        } else {
          const key = type
          const unit = r.metricUnit || typeToUnit(type)
@@ -279,8 +322,18 @@ export default {
      return rows
    })
 
+   // 记录列表：按日期降序排列（日期越晚排在前面）
+   const sortedRecords = computed(() => {
+     const list = records.value || []
+     return [...list].sort((a, b) => {
+       const da = new Date(a.recordDate || a.date || 0)
+       const db = new Date(b.recordDate || b.date || 0)
+       return db - da // 日期晚的在前
+     })
+   })
+
    onMounted(() => { fetch() })
-     return { year, month, metricSummary, query: {}, form, rules, formRef, resetForm, createRecord, records, loading, fetch, editVisible, editForm, startEdit, updateRecord, removeRecord, creating, updating, handleBack, formatMetricValue }
+     return { year, month, metricSummary, query: {}, form, rules, formRef, resetForm, createRecord, records, sortedRecords, loading, fetch, editVisible, editForm, startEdit, updateRecord, removeRecord, creating, updating, handleBack, formatMetricValue }
    }
  }
 </script>

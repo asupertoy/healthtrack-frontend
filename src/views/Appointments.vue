@@ -144,10 +144,16 @@ export default {
     const providers = ref([])
     const providersLoading = ref(false)
 
-    // 缓存已加载的 Provider，key 为 providerId
-    const providerCache = ref({})
-    // 映射 appointmentId -> providerName，便于在表格中展示
-    const providerNames = ref({})
+    // 不再使用额外缓存，直接通过 providerId 在 providers 列表中解析姓名
+
+    // 根据预约记录中的 providerId 在 providers 列表中查找医生姓名
+    const resolveProviderName = (appointment) => {
+      if (!appointment) return ''
+      const pid = appointment.providerId || appointment.provider?.providerId
+      if (!pid) return ''
+      const match = providers.value.find(p => String(p.providerId) === String(pid))
+      return match?.name || ''
+    }
 
     const getUserId = () => userStore.user?.userId || localStorage.getItem('userId') || 1
 
@@ -155,8 +161,8 @@ export default {
       loading.value = true
       try {
         await appointmentStore.fetchAppointments()
-        // 加载完预约后，根据 providerId 预取医生姓名
-        await preloadProviderNames()
+        console.log('[Appointments] loaded appointments:', appointmentStore.appointments)
+        console.log('[Appointments] loaded providers:', providers.value)
       } catch (e) {
         ns.push('error', e?.response?.data?.message || e.message || '加载预约失败')
       } finally {
@@ -291,32 +297,6 @@ export default {
     // confirmCancel 已不再使用，可以保持空实现或后续删除
     const confirmCancel = async () => {}
 
-    const fetchProviderIfNeeded = async providerId => {
-      const pid = Number(providerId)
-      if (!pid) return null
-      if (providerCache.value[pid]) return providerCache.value[pid]
-      try {
-        const p = await providerApi.getProviderById(pid)
-        providerCache.value[pid] = p
-        return p
-      } catch (e) {
-        ns.push('error', e?.response?.data?.message || e.message || `加载医生信息失败 (ID=${pid})`)
-        return null
-      }
-    }
-
-    const preloadProviderNames = async () => {
-      const appointments = appointmentStore.appointments || []
-      for (const a of appointments) {
-        const providerId = a.providerId || a.provider?.providerId
-        if (!providerId || !a.appointmentId) continue
-        const p = await fetchProviderIfNeeded(providerId)
-        if (p) {
-          providerNames.value[a.appointmentId] = p.name || p.providerName || ''
-        }
-      }
-    }
-
     const normalizeStatusType = s => {
       if (s == null) return undefined
       const key = String(s).toUpperCase()
@@ -332,8 +312,8 @@ export default {
     const formattedAppointments = computed(() =>
       (appointmentStore.appointments || []).map(a => ({
         ...a,
-        providerName: a.providerName || providerNames.value[a.appointmentId] || '',
-        // 直接用后端返回的时间字符串，通过 formatLocalDateTime 仅替换 T
+        // 直接使用 providerId 在 providers 列表中解析姓名
+        providerName: resolveProviderName(a),
         date: formatLocalDateTime(a.scheduledAt || a.date),
         createdAtFormatted: formatLocalDateTime(a.createdAt),
         statusType: normalizeStatusType(a.status),
@@ -341,10 +321,9 @@ export default {
     )
 
     onMounted(async () => {
-      await Promise.all([
-        refresh(),
-        loadProviders(),
-      ])
+      // 先加载医生列表，再按当前用户加载预约，这样 resolveProviderName 能立即工作
+      await loadProviders()
+      await refresh()
     })
 
     return {

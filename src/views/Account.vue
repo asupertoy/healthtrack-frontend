@@ -38,7 +38,16 @@
             <el-table-column prop="emailAddress" label="邮箱" />
             <el-table-column prop="verified" label="已验证" width="90">
               <template #default="{ row }">
-                <el-tag :type="row.verified ? 'success':'warning'">{{ row.verified ? '是':'否' }}</el-tag>
+                <span v-if="row.verified">
+                  <el-button type="text" size="small" @click="confirmUnverifyEmail(row)">
+                    <el-tag type="success">是</el-tag>
+                  </el-button>
+                </span>
+                <span v-else>
+                  <el-button type="text" size="small" @click="confirmVerifyEmail(row)">
+                    <el-tag type="warning">否</el-tag>
+                  </el-button>
+                </span>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="100">
@@ -63,9 +72,16 @@
             </el-table-column>
             <el-table-column prop="verified" label="已验证" width="90">
               <template #default="{ row }">
-                <el-tag :type="row.verified ? 'success' : 'warning'">
-                  {{ row.verified ? '是' : '否' }}
-                </el-tag>
+                <span v-if="row.verified">
+                  <el-button type="text" size="small" @click="confirmUnverifyPhone(row)">
+                    <el-tag type="success">是</el-tag>
+                  </el-button>
+                </span>
+                <span v-else>
+                  <el-button type="text" size="small" @click="confirmVerifyPhone(row)">
+                    <el-tag type="warning">否</el-tag>
+                  </el-button>
+                </span>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="120">
@@ -86,7 +102,7 @@
           </div>
           <el-table :data="displayedProviders" size="small" style="margin-top:10px">
             <!-- 如果是 provider-link DTO，可能包含 provider.name / provider.licenseNumber -->
-            <el-table-column label="名称">
+            <el-table-column label="姓名">
               <template #default="{ row }">{{ row.providerName || row.provider?.name || row.providerId || '-' }}</template>
             </el-table-column>
             <el-table-column label="执照号">
@@ -99,7 +115,16 @@
             </el-table-column>
             <el-table-column prop="verified" label="已验证" width="90">
               <template #default="{ row }">
-                <el-tag :type="row.verified ? 'success':'danger'">{{ row.verified ? '是':'否' }}</el-tag>
+                <span v-if="row.verified">
+                  <el-button type="text" size="small" @click="confirmUnverifyProvider(row)">
+                    <el-tag type="success">是</el-tag>
+                  </el-button>
+                </span>
+                <span v-else>
+                  <el-button type="text" size="small" @click="confirmVerifyProvider(row)">
+                    <el-tag type="danger">否</el-tag>
+                  </el-button>
+                </span>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="100">
@@ -252,6 +277,47 @@ export default {
       newEmail.value = ''
     }
 
+    // 点击“否”后确认并在前端标记邮箱为已验证
+    const confirmVerifyEmail = async (row) => {
+      try {
+        await ElMessageBox.confirm('是否已完成该邮箱的验证？', '验证确认', {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning',
+        })
+      } catch {
+        return
+      }
+      const emailAddress = row.emailAddress || row.email
+      try {
+        await userStore.verifyEmail(emailAddress)
+        emails.value = [...(userStore.emails || [])]
+        ns.push('success', '邮箱已标记为已验证')
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || '邮箱验证更新失败')
+      }
+    }
+
+    const confirmUnverifyEmail = async (row) => {
+      try {
+        await ElMessageBox.confirm('是否取消该邮箱的验证状态？', '取消验证', {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning',
+        })
+      } catch {
+        return
+      }
+      const emailAddress = row.emailAddress || row.email
+      try {
+        await userStore.unverifyEmail(emailAddress)
+        emails.value = [...(userStore.emails || [])]
+        ns.push('success', '邮箱已取消验证')
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || '取消邮箱验证失败')
+      }
+    }
+
     const removeEmail = async id => {
       try {
         await ElMessageBox.confirm('确定要删除该邮箱吗？该操作不可撤销。', '删除确认', {
@@ -280,6 +346,46 @@ export default {
       // 直接将手机号填入 newPhone 以便于保存
       newPhone.value = row.phoneNumber || row.phone
       editingPhoneId.value = row.phoneId || row.id
+    }
+
+    // 点击“否”后确认并在前端标记手机号为已验证
+    const confirmVerifyPhone = async (row) => {
+      try {
+        await ElMessageBox.confirm('是否已完成该手机号的验证？', '验证确认', {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning',
+        })
+      } catch {
+        return
+      }
+      try {
+        await userStore.verifyPhone()
+        phones.value = [...(userStore.phones || [])]
+        // 同步基本资料中的手机号验证状态不需要单独字段，这里仅提示
+        ns.push('success', '手机号已标记为已验证')
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || '手机号验证更新失败')
+      }
+    }
+
+    const confirmUnverifyPhone = async (row) => {
+      try {
+        await ElMessageBox.confirm('是否取消该手机号的验证状态？', '取消验证', {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning',
+        })
+      } catch {
+        return
+      }
+      try {
+        await userStore.unverifyPhone()
+        phones.value = [...(userStore.phones || [])]
+        ns.push('success', '手机号已取消验证')
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || '取消手机号验证失败')
+      }
     }
 
     const savePhone = async () => {
@@ -318,6 +424,49 @@ export default {
       providers.value.push(enriched[0])
       ns.push('success', '已关联提供者')
       newProviderId.value = ''
+    }
+
+    // 点击“否”后确认并在前端标记 provider 关联为已验证
+    const confirmVerifyProvider = async (row) => {
+      try {
+        await ElMessageBox.confirm('是否已完成该医疗提供者的验证？', '验证确认', {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning',
+        })
+      } catch {
+        return
+      }
+      const linkId = row.linkId || row.id
+      try {
+        await userStore.verifyProviderLink(linkId)
+        const links = await userStore.fetchProviderLinks()
+        providers.value = await enrichProviderLinks(links)
+        ns.push('success', '医疗提供者关联已标记为已验证')
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || '医疗提供者验证更新失败')
+      }
+    }
+
+    const confirmUnverifyProvider = async (row) => {
+      try {
+        await ElMessageBox.confirm('是否取消该医疗提供者的验证状态？', '取消验证', {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning',
+        })
+      } catch {
+        return
+      }
+      const linkId = row.linkId || row.id
+      try {
+        await userStore.unverifyProviderLink(linkId)
+        const links = await userStore.fetchProviderLinks()
+        providers.value = await enrichProviderLinks(links)
+        ns.push('success', '医疗提供者验证状态已取消')
+      } catch (e) {
+        ns.push('error', e?.response?.data?.message || e.message || '取消医疗提供者验证失败')
+      }
     }
 
     const unlinkProvider = async linkId => {
@@ -399,11 +548,17 @@ export default {
       displayedProviders,
       addEmail,
       removeEmail,
+      confirmVerifyEmail,
+      confirmUnverifyEmail,
       editPhone,
       savePhone,
       cancelEditPhone,
+      confirmVerifyPhone,
+      confirmUnverifyPhone,
       linkProvider,
       unlinkProvider,
+      confirmVerifyProvider,
+      confirmUnverifyProvider,
       fetchProviderLinks,
       rawProvidersVisible,
       userStore,

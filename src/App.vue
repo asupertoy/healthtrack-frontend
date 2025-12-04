@@ -59,9 +59,34 @@ const handleLogout = () => {
 </script>
 
 <style>
-body { margin:0; font-family:"Segoe UI", Arial, sans-serif; background:#f6f9fc; }
-.layout { display:flex; flex-direction:column; height:100vh; }
-.body { flex:1; display:flex; }
-.content { flex:1; padding:20px 28px; overflow:auto; background:#fff; box-shadow:inset 0 0 0 1px #ebeef5; }
-@media (max-width: 860px){ .body { flex-direction:column; } }
+body {
+  margin: 0;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  background: #f3f5f9;
+  color: #303133;
+}
+.layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.body {
+  flex: 1;
+  display: flex;
+  background: linear-gradient(135deg, #f5f7fa 0%, #edf1f7 50%, #f5f7fa 100%);
+}
+.content {
+  flex: 1;
+  padding: 20px 28px;
+  overflow: auto;
+  background: transparent;
+}
+.content > * {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+@media (max-width: 860px) {
+  .body { flex-direction: column; }
+  .content { padding: 16px; }
+}
 </style>
