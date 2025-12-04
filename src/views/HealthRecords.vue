@@ -22,7 +22,7 @@
     <SectionCard title="新增记录">
       <el-form :model="form" ref="formRef" label-width="90px" :rules="rules" class="record-form">
         <el-form-item label="日期" prop="recordDate">
-          <el-date-picker v-model="form.recordDate" type="date" placeholder="选择日期" />
+          <el-date-picker v-model="form.recordDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" />
         </el-form-item>
         <el-form-item label="类型" prop="metricType">
           <el-select v-model="form.metricType" placeholder="指标类型" filterable>
@@ -50,7 +50,11 @@
         <el-table-column type="index" width="50" />
         <el-table-column prop="recordDate" label="日期" />
         <el-table-column prop="metricType" label="类型" />
-        <el-table-column prop="metricValue" label="数值" />
+        <el-table-column label="数值">
+          <template #default="{ row }">
+            {{ formatMetricValue(row) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="metricUnit" label="单位" />
         <el-table-column label="操作" width="150">
           <template #default="{ row }">
@@ -63,7 +67,7 @@
     <el-dialog v-model="editVisible" title="编辑记录" width="420px">
       <el-form :model="editForm" label-width="90px">
         <el-form-item label="日期">
-          <el-date-picker v-model="editForm.recordDate" type="date" />
+          <el-date-picker v-model="editForm.recordDate" type="date" value-format="YYYY-MM-DD" />
         </el-form-item>
         <el-form-item label="类型">
           <el-input v-model="editForm.metricType" />
@@ -83,7 +87,7 @@
   </div>
 </template>
 <script>
-import { ref, reactive, watch, computed } from 'vue'
+import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import SectionCard from '../components/SectionCard.vue'
 import { useHealthStore } from '../stores/healthStore'
@@ -111,88 +115,174 @@ export default {
     }
     const editVisible = ref(false)
     const editForm = reactive({ recordId:null, recordDate:'', metricType:'', metricValue:null, metricUnit:'' })
-    const getUserId = () => userStore.user?.userId || userStore.userId || 1
-
-    // 月份选择（默认当前月份）
-    const year = ref(new Date().getFullYear())
-    const month = ref(new Date().getMonth() + 1)
-
-    // 类型到单位映射
-    const typeToUnit = type => {
-      switch (type) {
-        case 'weight':
-          return 'kg'
-        case 'blood_pressure':
-          return 'mmHg'
-        case 'heart_rate':
-          return 'bpm'
-        case 'steps':
-          return '步'
-        default:
-          return ''
+    const getUserId = () => userStore.user?.userId || userStore.userId || null
+    const ensureUserLoaded = async () => {
+      if (!userStore.user && userStore.userId) {
+        await userStore.restoreSession()
       }
+      return userStore.user?.userId || userStore.userId || null
     }
 
-    // 选择类型时自动填单位
-    watch(
-      () => form.metricType,
-      newType => {
-        form.metricUnit = typeToUnit(newType)
-      }
-    )
+   // 月份选择（默认当前月份）
+   const year = ref(new Date().getFullYear())
+   const month = ref(new Date().getMonth() + 1)
 
-    const fetch = async () => {
-      loading.value=true
-      try {
-        const list = await healthStore.fetchHealthRecords(getUserId())
-        // 不再按日期范围查询，只缓存全部记录，后面按月份过滤
-        records.value = list
-      } finally {
-        loading.value=false
+   // 类型到单位映射
+   const typeToUnit = type => {
+     switch (type) {
+       case 'weight':
+         return 'kg'
+       case 'blood_pressure':
+         return 'mmHg'
+       case 'heart_rate':
+         return 'bpm'
+       case 'steps':
+         return '步'
+       default:
+         return ''
+     }
+   }
+
+   // 选择类型时自动填单位
+   watch(
+     () => form.metricType,
+     newType => {
+       form.metricUnit = typeToUnit(newType)
+     }
+   )
+
+   const fetch = async () => {
+     loading.value=true
+     try {
+       const uid = await ensureUserLoaded()
+       if (!uid) {
+         records.value = []
+         return
+       }
+       const list = await healthStore.fetchHealthRecords(uid)
+       // 缓存全部记录，后面按月份过滤
+       records.value = list || []
+     } finally {
+       loading.value=false
+     }
+   }
+
+   const resetForm = () => { form.recordDate=''; form.metricType=''; form.metricValue=null; form.metricUnit='' }
+
+    // Format metric value; for blood_pressure when metricValue is null, show metricJson contents
+    const formatMetricValue = (row) => {
+      if (!row) return ''
+      const type = row.metricType
+      const val = row.metricValue
+      // support snake_case or camelCase metricJson
+      const mjson = row.metricJson || row.metric_json || row.metricJSON || null
+      if (type === 'blood_pressure' && (val === null || val === undefined || val === '')) {
+        if (!mjson) return ''
+        // mjson might be a stringified JSON or an object
+        let obj = mjson
+        if (typeof mjson === 'string') {
+          try { obj = JSON.parse(mjson) } catch (e) { /* fall back to raw string */ return mjson }
+        }
+        // common keys: systolic/diastolic or systolicPressure/diastolicPressure
+        const s = obj.systolic ?? obj.systolicPressure ?? obj.s ?? obj.sys ?? null
+        const d = obj.diastolic ?? obj.diastolicPressure ?? obj.d ?? obj.dia ?? null
+        if (s != null && d != null) return `${s}/${d}`
+        // otherwise pretty-print whole object
+        try { return JSON.stringify(obj) } catch (e) { return String(obj) }
       }
+      // default display
+      return val == null ? '' : String(val)
     }
 
-    const resetForm = () => { form.recordDate=''; form.metricType=''; form.metricValue=null; form.metricUnit='' }
     const createRecord = () => { formRef.value.validate(async valid => { if(!valid) return; creating.value=true; try { const created = await healthApi.createRecord(getUserId(), { recordDate:form.recordDate, metricType:form.metricType, metricValue:form.metricValue, metricUnit:form.metricUnit }); records.value.push(created); ns.push('success','记录已添加'); resetForm() } finally { creating.value=false } }) }
     const startEdit = (row) => { Object.assign(editForm, row); editVisible.value=true }
     const updateRecord = async () => { updating.value=true; try { const updated = await healthApi.updateRecord({ id:editForm.recordId, recordDate:editForm.recordDate, metricType:editForm.metricType, metricValue:editForm.metricValue, metricUnit:editForm.metricUnit }); const idx = records.value.findIndex(r=>r.recordId===editForm.recordId); if(idx!==-1) records.value[idx]=updated; ns.push('info','记录已更新'); editVisible.value=false } finally { updating.value=false } }
     const removeRecord = async (id) => { await healthApi.deleteRecord(id); records.value = records.value.filter(r=>r.recordId!==id); ns.push('warning','记录已删除') }
 
-    // 计算当前选择月份的指标统计
-    const metricSummary = computed(() => {
-      if (!records.value.length) return []
-      const ym = `${year.value}-${String(month.value).padStart(2,'0')}`
-      const monthRecords = records.value.filter(r => (r.recordDate || '').startsWith(ym))
-      if (!monthRecords.length) return []
-      const groups = {}
-      monthRecords.forEach(r => {
-        const key = r.metricType
-        if (!groups[key]) {
-          groups[key] = { values: [], unit: r.metricUnit || typeToUnit(r.metricType) }
-        }
-        const v = Number(r.metricValue)
-        if (!Number.isNaN(v)) groups[key].values.push(v)
-      })
-      return Object.entries(groups).map(([metricType, { values, unit }]) => {
-        if (!values.length) {
-          return { metricType, unit, avg: null, min: null, max: null, count: 0 }
-        }
-        const sum = values.reduce((a,b) => a + b, 0)
-        return {
-          metricType,
-          unit,
-          avg: (sum / values.length).toFixed(1),
-          min: Math.min(...values),
-          max: Math.max(...values),
-          count: values.length,
-        }
-      })
-    })
+   // 计算当前选择月份的指标统计（血压拆分为收缩/舒张分别统计）
+   const metricSummary = computed(() => {
+     if (!records.value.length) return []
+     const ym = `${year.value}-${String(month.value).padStart(2,'0')}`
+     const monthRecords = records.value.filter(r => (r.recordDate || '').startsWith(ym))
+     if (!monthRecords.length) return []
 
-    fetch()
-    return { year, month, metricSummary, query: {}, form, rules, formRef, resetForm, createRecord, records, loading, fetch, editVisible, editForm, startEdit, updateRecord, removeRecord, creating, updating, handleBack }
-  }
-}
+     const groups = {}
+
+     const pushValue = (key, value, unit) => {
+       if (value == null || value === '') return
+       const num = Number(value)
+       if (Number.isNaN(num)) return
+       if (!groups[key]) groups[key] = { values: [], unit }
+       groups[key].values.push(num)
+     }
+
+     monthRecords.forEach(r => {
+       const type = r.metricType
+       // handle blood_pressure specially
+       if (type === 'blood_pressure') {
+         // metricValue may be null; try metricJson for systolic/diastolic
+         const mjson = r.metricJson || r.metric_json || r.metricJSON || null
+         let obj = null
+         if (mjson) {
+           obj = typeof mjson === 'string' ? (() => { try { return JSON.parse(mjson) } catch(e){ return null } })() : mjson
+         }
+         const s = obj?.systolic ?? obj?.systolicPressure ?? obj?.s ?? obj?.sys ?? null
+         const d = obj?.diastolic ?? obj?.diastolicPressure ?? obj?.d ?? obj?.dia ?? null
+         // also if metricValue itself encodes combined value like '120/80', try parse
+         if ((r.metricValue === null || r.metricValue === undefined || r.metricValue === '') && typeof r.metricValue === 'string') {
+           const parts = (r.metricValue || '').split('/').map(p => p.trim())
+           if (parts.length === 2) { pushValue('blood_pressure_systolic', parts[0], 'mmHg'); pushValue('blood_pressure_diastolic', parts[1], 'mmHg'); return }
+         }
+         // push numeric metricValue if present (unlikely for BP)
+         if (r.metricValue !== null && r.metricValue !== undefined && r.metricValue !== '') {
+           // if it's a number, assume it's systolic? but better skip; try to parse as number and push to systolic
+           const num = Number(r.metricValue)
+           if (!Number.isNaN(num)) pushValue('blood_pressure_systolic', num, 'mmHg')
+         }
+         // push parsed s/d
+         if (s != null) pushValue('blood_pressure_systolic', s, 'mmHg')
+         if (d != null) pushValue('blood_pressure_diastolic', d, 'mmHg')
+       } else {
+         const key = type
+         const unit = r.metricUnit || typeToUnit(type)
+         pushValue(key, r.metricValue, unit)
+       }
+     })
+
+     // Map groups to display rows. For blood pressure keys, set friendly labels.
+     const rows = []
+     for (const [metricType, { values, unit }] of Object.entries(groups)) {
+       if (!values || values.length === 0) {
+         rows.push({ metricType, unit, avg: null, min: null, max: null, count: 0 })
+         continue
+       }
+       const sum = values.reduce((a,b) => a + b, 0)
+       const entry = {
+         metricType,
+         unit,
+         avg: (sum / values.length).toFixed(1),
+         min: Math.min(...values),
+         max: Math.max(...values),
+         count: values.length,
+       }
+       // Make metricType human-friendly for blood pressure
+       if (metricType === 'blood_pressure_systolic') entry.metricType = 'blood_pressure (收缩)'
+       if (metricType === 'blood_pressure_diastolic') entry.metricType = 'blood_pressure (舒张)'
+       rows.push(entry)
+     }
+     // Optionally sort rows so blood pressure appear together and others alphabetical
+     rows.sort((a,b) => {
+       if (a.metricType.startsWith('blood_pressure') && !b.metricType.startsWith('blood_pressure')) return -1
+       if (!a.metricType.startsWith('blood_pressure') && b.metricType.startsWith('blood_pressure')) return 1
+       return String(a.metricType).localeCompare(String(b.metricType))
+     })
+     return rows
+   })
+
+   onMounted(() => { fetch() })
+     return { year, month, metricSummary, query: {}, form, rules, formRef, resetForm, createRecord, records, loading, fetch, editVisible, editForm, startEdit, updateRecord, removeRecord, creating, updating, handleBack, formatMetricValue }
+   }
+ }
 </script>
 <style scoped>
 .filters { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px; }

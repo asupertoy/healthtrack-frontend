@@ -3,6 +3,9 @@
     <el-page-header content="家庭组" />
     <!-- 我的家庭组：当前选中的家庭组 -->
     <SectionCard title="我的家庭组">
+      <div style="margin-bottom:8px">
+        <el-button size="small" @click="refresh">刷新</el-button>
+      </div>
       <el-table
         :data="myGroups"
         size="small"
@@ -52,23 +55,30 @@ import { ref, onMounted, computed } from 'vue'
 import { useFamilyStore } from '../stores/familyStore'
 import { useNotificationStore } from '../stores/notificationStore'
 import SectionCard from '../components/SectionCard.vue'
+import { useUserStore } from '../stores/userStore'
 
 export default {
   components: { SectionCard },
   setup() {
     const familyStore = useFamilyStore()
     const ns = useNotificationStore()
+    const userStore = useUserStore()
     const currentGroup = ref(null)
     const members = ref([])
+    const loading = ref(false)
 
-    const groups = computed(() => familyStore.groups || [])
     const myGroups = computed(() => (currentGroup.value ? [currentGroup.value] : []))
 
     const refreshGroups = async () => {
       try {
+        loading.value = true
         await familyStore.fetchGroups()
+        return familyStore.groups || []
       } catch (e) {
         ns.push('error', e.message || '加载家庭组失败')
+        return []
+      } finally {
+        loading.value = false
       }
     }
 
@@ -91,13 +101,38 @@ export default {
       await loadMembers(row)
     }
 
-    onMounted(async () => {
-      await refreshGroups()
-      if (groups.value.length > 0 && !currentGroup.value) {
-        currentGroup.value = groups.value[0]
-        await loadMembers(currentGroup.value)
+    const findMyGroup = async () => {
+      try {
+        // ensure user loaded
+        if (!userStore.user && userStore.userId) await userStore.restoreSession()
+        const userId = userStore.user?.userId || userStore.userId
+        if (!userId) return
+
+        const all = await refreshGroups()
+        // iterate groups and attempt to find membership
+        for (const g of all || []) {
+          const gid = g.groupId ?? g.id
+          if (!gid) continue
+          const mems = await familyStore.fetchMembers(gid)
+          // backend now returns members with userId field
+          const found = (mems || []).find(m => m.userId === userId)
+          if (found) {
+            currentGroup.value = g
+            members.value = mems || []
+            return
+          }
+        }
+        // none found
+        currentGroup.value = null
+        members.value = []
+      } catch (e) {
+        ns.push('error', e.message || '查找用户家庭组失败')
       }
-    })
+    }
+
+    const refresh = async () => { await findMyGroup() }
+
+    onMounted(async () => { await findMyGroup() })
 
     // 将 "2025-11-27T13:15:21" 或 "2025-11-27 13:15:21" 统一显示为 "2025-11-27 13:15:21"
     const formatJoinedAt = (value) => {
@@ -116,11 +151,12 @@ export default {
       members,
       selectGroup,
       formatJoinedAt,
+      refresh,
+      loading,
     }
   },
 }
 </script>
 
-<style scoped>
-.flex-row { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+<style>
 </style>

@@ -19,7 +19,8 @@ export default {
     },
 
     updateUser(userId, payload) {
-        return http.put(`/users/${userId}`, payload).then(res => res.data)
+        // Use PATCH for partial updates (backend expects PATCH for updating user fields)
+        return http.patch(`/users/${userId}`, payload).then(res => res.data)
     },
 
     // 邮箱相关（如果未来在 /users/{id}/emails 下挂，可使用此方法；当前实际使用 EmailController 的接口）
@@ -27,8 +28,23 @@ export default {
         return http.post(`/users/${userId}/emails`, { emailAddress }).then(res => res.data)
     },
 
-    removeEmail(emailId) {
-        return http.delete(`/emails/${emailId}`).then(res => res.data)
+    removeEmail(emailId, userId) {
+        // Some backends expect DELETE with JSON body { userId }, others expect ?userId=...
+        // Try sending a DELETE with body first, then fall back to query param.
+        const bodyCfg = userId ? { data: { userId }, headers: { 'Content-Type': 'application/json' } } : {}
+        return http.request({ method: 'delete', url: `/emails/${emailId}`, ...bodyCfg })
+            .then(res => res.data)
+            .catch(async err => {
+                // fallback: try query param approach
+                try {
+                    const cfg = userId ? { params: { userId } } : undefined
+                    const res2 = await http.delete(`/emails/${emailId}`, cfg)
+                    return res2.data
+                } catch (err2) {
+                    // prefer original error for debugging
+                    throw err
+                }
+            })
     },
 
     // 手机号相关（如果有对应后端接口）
@@ -43,12 +59,13 @@ export default {
     // 通过 EmailController 创建邮箱记录（/api/emails/create）
     createEmailForUser(userId, emailAddress) {
         // 对应后端 POST /api/emails/create
-        return http.post('/emails/create', { emailAddress, userId }).then(res => res.data)
-    },
-
-    // 标记邮箱验证/取消验证（/api/emails/verify /api/emails/unverify）
-    verifyEmail(emailAddress) {
-        return http.post('/emails/verify', null, { params: { emailAddress } }).then(res => res.data)
+        // Ensure we include userId in payload and provide both email and emailAddress keys
+        const payload = {userId, user_id: userId}
+        if (emailAddress !== undefined) {
+            payload.emailAddress = emailAddress
+            payload.email = emailAddress
+        }
+        return http.post('/emails/create', payload).then(res => res.data);
     },
 
     unverifyEmail(emailAddress) {

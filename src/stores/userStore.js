@@ -133,9 +133,22 @@ export const useUserStore = defineStore('userStore', {
         // 更新用户基本信息
         async updateUser(payload) {
             if (!this.user?.userId) throw new Error('No user loaded')
+            // Try patching the user
             const data = await userApi.updateUser(this.user.userId, payload)
-            this.user = data
-            return data
+            // Some backends may return an empty body for PATCH; ensure we have a full user object
+            if (data && (data.userId || data.user_id)) {
+                this.user = data
+                return this.user
+            }
+            // Fallback: re-fetch the user by ID to get a complete object
+            try {
+                const refreshed = await userApi.getUserById(this.user.userId)
+                this.user = refreshed
+                return this.user
+            } catch (e) {
+                // If re-fetch fails, still try to preserve previous user state
+                return this.user
+            }
         },
 
         // 邮箱相关
@@ -148,8 +161,15 @@ export const useUserStore = defineStore('userStore', {
         },
 
         async removeEmail(emailId) {
-            // 当前后端只提供 /api/emails/verify /unverify 和 /create，没有删除接口，
-            // 这里先仅从前端列表移除以避免 404；如果后端增加 DELETE /api/emails/{id} 可在此调用
+            // call backend DELETE /api/emails/{id} and update local cache
+            if (!this.user?.userId) throw new Error('No user loaded')
+            try {
+                // include current userId as query param for backend ownership validation
+                await userApi.removeEmail(emailId, this.user.userId)
+            } catch (e) {
+                // bubble up error so UI can show feedback
+                throw e
+            }
             this.emails = this.emails.filter(e => e.emailId !== emailId && e.id !== emailId)
         },
 
@@ -162,8 +182,43 @@ export const useUserStore = defineStore('userStore', {
         },
 
         async removePhone(phoneId) {
-            await userApi.removePhone(phoneId)
+            if (!this.user?.userId) throw new Error('No user loaded')
+            try {
+                await userApi.removePhone(phoneId, this.user.userId)
+            } catch (e) {
+                throw e
+            }
             this.phones = this.phones.filter(p => p.phoneId !== phoneId && p.id !== phoneId)
+        },
+
+        // 更新手机号（部分更新 user）；将 user.phone 更新为新值，并同步本地 phones 数组
+        async updatePhone(input) {
+            // input can be a string (phone number) or an object { id, phoneNumber }
+            if (!this.user?.userId) throw new Error('No user loaded')
+            const phoneNumber = typeof input === 'string' ? input : (input?.phoneNumber || input?.number || null)
+            if (!phoneNumber) throw new Error('No phone number provided')
+            // Build payload: clear verification; backend will set updatedAt automatically
+            const payload = {
+                phone: phoneNumber,
+                phoneVerified: false,
+                phoneVerifiedAt: null,
+            }
+
+            try {
+                const updatedUser = await this.updateUser(payload)
+                // Ensure local user reflects changes (don't set updatedAt here; backend manages it)
+                this.user = Object.assign({}, this.user, updatedUser || {}, {
+                    phone: phoneNumber,
+                    phoneVerified: false,
+                    phoneVerifiedAt: null,
+                })
+            } catch (e) {
+                throw e
+            }
+
+            // reflect in local phones array
+            this.phones = [{ phoneId: this.user.userId, phoneNumber, verified: false }]
+            return this.phones[0]
         },
 
         // Provider 关联（使用 /users/{userId}/provider-links）
@@ -177,6 +232,19 @@ export const useUserStore = defineStore('userStore', {
         async unlinkProvider(linkId) {
             await userApi.deleteProviderLink(linkId)
             this.providers = this.providers.filter(p => p.id !== linkId && p.linkId !== linkId)
+        },
+
+        // 明确暴露一个按 userId 拉取 provider-links 的方法，供 UI 手动刷新使用
+        async fetchProviderLinks() {
+            if (!this.userId) throw new Error('No userId available')
+            try {
+                const links = await userApi.getProviderLinks(this.userId)
+                this.providers = links || []
+                return this.providers
+            } catch (e) {
+                this.providers = []
+                throw e
+            }
         },
     },
 })
