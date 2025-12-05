@@ -23,10 +23,12 @@
           ></el-input>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="loading" @click="handleLogin">登录</el-button>
-          <el-button @click="reset">重置</el-button>
-          <el-button type="text" @click="goRegister">没有账号？去注册</el-button>
+          <el-button type="primary" :loading="loading" @click="handleLogin" class="login-btn">登录</el-button>
+          <el-button @click="reset" class="reset-btn">重置</el-button>
         </el-form-item>
+        <div class="footer-links">
+          <el-button type="text" @click="goRegister">没有账号？去注册</el-button>
+        </div>
         <el-alert v-if="error" :title="error" type="error" show-icon class="error-alert" />
       </el-form>
     </el-card>
@@ -98,12 +100,27 @@ export default {
 }
 .login-card {
   width: 400px;
+  border-radius: 12px;
 }
 .header {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
+  text-align: center;
+  color: #303133;
+}
+.login-btn {
+  width: 100%;
+}
+.reset-btn {
+  width: 100%;
+  margin-top: 10px;
+  margin-left: 0;
+}
+.footer-links {
+  text-align: center;
+  margin-top: 10px;
 }
 .error-alert {
-  margin-top: 10px;
+  margin-top: 15px;
 }
 </style>

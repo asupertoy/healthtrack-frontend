@@ -1,6 +1,13 @@
 <template>
   <div>
-    <el-page-header content="预约管理" @back="handleBack" />
+    <div class="page-header-bar">
+      <div>
+        <h2 class="page-header-title">预约管理</h2>
+        <p class="page-header-subtitle">创建新的预约并查看当前进度</p>
+      </div>
+      <el-button @click="handleBack">返回</el-button>
+    </div>
+
     <SectionCard title="创建预约">
       <el-form :model="form" label-width="110px" ref="formRef" :rules="rules" class="create-form">
         <!-- 预约对象：bookingUser 由当前登录用户决定，不在表单中输入 -->
@@ -117,7 +124,7 @@ export default {
   setup() {
     const router = useRouter()
     const handleBack = () => {
-      router.back()
+      router.push('/dashboard')
     }
 
     const appointmentStore = useAppointmentStore()
@@ -350,4 +357,69 @@ export default {
 
 <style scoped>
 /* 保持原有样式不变 */
+.page-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.page-header-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.page-header-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.create-form {
+  padding: 24px;
+}
+
+.create-form .el-form-item {
+  margin-bottom: 16px;
+}
+
+.create-form .el-button {
+  margin-right: 8px;
+}
+
+.toolbar {
+  padding: 16px 0;
+  text-align: right;
+}
+
+.el-table {
+  width: 100%;
+}
+
+.el-table .el-table-column {
+  padding: 0 16px;
+}
+
+.el-table .el-table-column label {
+  font-weight: 500;
+}
+
+.el-table .el-table-column .cell {
+  padding: 12px 0;
+}
+
+.el-table .el-table-column.is-leaf {
+  text-align: right;
+}
+
+.el-tag {
+  font-size: 14px;
+}
+
+.el-button {
+  font-size: 14px;
+}
 </style>

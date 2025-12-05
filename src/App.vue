@@ -77,7 +77,7 @@ body {
 }
 .content {
   flex: 1;
-  padding: 20px 28px;
+  padding: 20px 28px 32px;
   overflow: auto;
   background: transparent;
 }
@@ -86,7 +86,31 @@ body {
   margin: 0 auto;
 }
 @media (max-width: 860px) {
-  .body { flex-direction: column; }
-  .content { padding: 16px; }
+  .body {
+    flex-direction: column;
+    min-height: 100vh;
+    background: #f7f8fc;
+  }
+  .content {
+    padding: 16px;
+  }
+  /* 登录 / 注册 页使用渐变背景，子内容居中 */
+  .body .content > * {
+    max-width: 460px;
+  }
+}
+html, body, #app {
+  min-height: 100vh;
+}
+/* 登录/注册 单独背景需要撑满 */
+#app .body .content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+@media (min-width: 861px) {
+  #app .body .content > * {
+    width: 100%;
+  }
 }
 </style>

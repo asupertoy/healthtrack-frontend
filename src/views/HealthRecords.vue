@@ -1,6 +1,11 @@
 <template>
   <div>
-    <el-page-header content="健康记录" @back="handleBack" />
+    <div class="page-header-bar">
+      <div>
+        <h2 class="page-header-title">健康记录</h2>
+        <p class="page-header-subtitle">记录每日健康指标，查看月度摘要</p>
+      </div>
+    </div>
     <!-- 月度健康小结 -->
     <SectionCard title="月度健康小结">
       <div class="filters">
@@ -340,4 +345,19 @@ export default {
 <style scoped>
 .filters { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
 .record-form { max-width:560px; }
+.page-header-bar {
+  background-color: #f5f7fa;
+  padding: 16px;
+  border-bottom: 1px solid #e4e7ed;
+}
+.page-header-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 500;
+}
+.page-header-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #666;
+}
 </style>

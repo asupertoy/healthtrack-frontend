@@ -27,9 +27,11 @@
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="loading" @click="handleRegister">注册</el-button>
-          <el-button @click="goLogin">已有账号？去登录</el-button>
+          <el-button type="primary" :loading="loading" @click="handleRegister" class="register-btn">注册</el-button>
         </el-form-item>
+        <div class="footer-links">
+          <el-button type="text" @click="goLogin">已有账号？去登录</el-button>
+        </div>
         <el-alert v-if="error" :title="error" type="error" show-icon class="error-alert" />
         <el-alert v-if="success" :title="success" type="success" show-icon class="success-alert" />
       </el-form>
@@ -131,13 +133,23 @@ export default {
 }
 .register-card {
   width: 420px;
+  border-radius: 12px;
 }
 .header {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
+  text-align: center;
+  color: #303133;
+}
+.register-btn {
+  width: 100%;
+}
+.footer-links {
+  text-align: center;
+  margin-top: 10px;
 }
 .error-alert,
 .success-alert {
-  margin-top: 10px;
+  margin-top: 15px;
 }
 </style>

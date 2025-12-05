@@ -1,6 +1,11 @@
 <template>
   <div>
-    <el-page-header content="账户信息" />
+    <div class="page-header-bar">
+      <div>
+        <h2 class="page-header-title">账户信息</h2>
+        <p class="page-header-subtitle">管理个人资料、邮箱、手机号和医疗提供者关联</p>
+      </div>
+    </div>
     <el-tabs v-model="activeTab" class="account-tabs">
       <el-tab-pane label="基本资料" name="profile">
         <SectionCard title="基本资料">
@@ -576,4 +581,20 @@ export default {
 <style scoped>
 .account-tabs { margin-top:10px; }
 .flex-row { display:flex; gap:10px; align-items:center; margin-bottom:6px; }
+.page-header-bar {
+  background-color: #f5f7fa;
+  padding: 16px;
+  border-bottom: 1px solid #e4e7ec;
+}
+.page-header-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+}
+.page-header-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #666;
+}
 </style>
